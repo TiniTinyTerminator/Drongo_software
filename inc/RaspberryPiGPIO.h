@@ -35,7 +35,6 @@ enum class PhysicalToBCM : int {
     PIN37 = 26,   // Physical pin 37 to BCM GPIO26
     PIN38 = 20,   // Physical pin 38 to BCM GPIO20
     PIN40 = 21    // Physical pin 40 to BCM GPIO21
-    // ... continue for all relevant pins.
 };
 
 } // namespace RaspberryPi

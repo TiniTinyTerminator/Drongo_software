@@ -2,12 +2,13 @@
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm64)
 # which compilers to use for C and C++
-set(CMAKE_C_COMPILER   arm-linux-gnueabihf-gcc)
-set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
+set(CMAKE_C_COMPILER   aarch64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
 # where is the target environment located
-set(CMAKE_SYSTEM_INCLUDE_PATH  /usr/arm-linux-gnueabihf/include)
-set(CMAKE_SYSTEM_LIBRARY_PATH  /usr/arm-linux-gnueabihf/lib)
+set(CMAKE_SYSTEM_INCLUDE_PATH   /usr/aarch64-linux-gnu/include)
+set(CMAKE_SYSTEM_LIBRARY_PATH   /usr/aarch64-linux-gnu/lib)
+set(CMAKE_SYSTEM_PREFIX_PATH    /usr/aarch64-linux-gnu)
 
 # adjust the default behavior of the FIND_XXX() commands:
 # search programs in the host environment

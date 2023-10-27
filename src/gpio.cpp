@@ -16,7 +16,7 @@ void Gpio::setup()
 {
     chip = gpiod_chip_open(device_file.c_str());
 
-    if(!chip)
+    if (!chip)
         throw std::runtime_error("requested gpiochip could not be opened");
 
     label = gpiod_chip_label(chip);
@@ -58,7 +58,10 @@ void Gpio::set_output(int line_id, Values value)
     if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_OUTPUT)
         throw std::runtime_error("requested line is not configured as output");
 
-    gpiod_line_set_value(line, value == Values::HIGH ? GPIOD_LINE_ACTIVE_STATE_HIGH : GPIOD_LINE_ACTIVE_STATE_LOW);
+    int ret = gpiod_line_set_value(line, value);
+
+    if (!ret)
+        std::runtime_error("requested line is not changed");
 }
 
 Values Gpio::get_input(int line_id)
@@ -120,8 +123,7 @@ bool Gpio::wait_for_event(int line_id, std::chrono::nanoseconds timeout)
 
     timespec timeout_spec = {
         .tv_sec = static_cast<time_t>(secs.count()),
-        .tv_nsec = static_cast<long>(nano.count())
-    };
+        .tv_nsec = static_cast<long>(nano.count())};
 
     switch (gpiod_line_event_wait(line, &timeout_spec))
     {

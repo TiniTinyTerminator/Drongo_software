@@ -1,0 +1,56 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+            "label": "Start GDB Server",
+            "type": "shell",
+            "command": "ssh",  // SSH into the Raspberry Pi
+            "args": [
+                "max@192.168.202.148",  // Replace with your Raspberry Pi's SSH address
+                "'gdbserver --multi :4711 ~/Drongo_software'", 
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+			"detail": "Starts the gdbserver and waits for success",
+			"isBackground": true,
+			"problemMatcher": {
+				"pattern": [
+					{
+						"regexp": ".",
+						"file": 1,
+						"location": 2,
+						"message": 3
+					}
+				],
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^.*Process*",
+					"endsPattern": "^.*Listening*",
+					
+				}
+			},
+			// "dependsOn": "copy to rpi" 
+        },
+		{
+			"label": "copy to rpi",
+			"type": "shell",
+			"command": "scp ${workspaceFolder}/build/Drongo_software max@192.168.202.148:~/",
+			"problemMatcher": [],
+			// "dependsOn": "CMake Build"
+		},
+		{
+            "label": "CMake Build",
+            "type": "shell",
+            "command": "cmake --build ${workspaceFolder}/build", // Adjust the path to your build directory if different
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+	]
+}

@@ -49,7 +49,7 @@ void Spi::transmit(std::vector<char> tx)
     {
         .tx_buf = (unsigned long long)tx.data(),
         .rx_buf = (unsigned long long)nullptr,
-        .len = tx.size()
+        .len = (unsigned int)tx.size()
     };
     
     int ret = ioctl(fd, SPI_IOC_MESSAGE(1), &data);
@@ -68,7 +68,7 @@ std::vector<char> Spi::transceive(std::vector<char> tx)
     {
         .tx_buf = (unsigned long long)tx.data(),
         .rx_buf = (unsigned long long)rx.data(),
-        .len = tx.size()
+        .len = (unsigned int)tx.size()
     };
     
     int ret = ioctl(fd, SPI_IOC_MESSAGE(1), &data);

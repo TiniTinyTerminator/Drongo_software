@@ -8,7 +8,7 @@
  * @brief possible in- and output values of a gpio pin
  * 
  */
-enum class Values {
+enum Values : int {
     LOW = 0x0,
     HIGH
 };
@@ -17,7 +17,7 @@ enum class Values {
  * @brief possible directions of a gpio pin
  * 
  */
-enum class Direction {
+enum Direction : int {
     INPUT = 0x0,
     OUTPUT
 };
@@ -26,7 +26,7 @@ enum class Direction {
  * @brief types of edge detection for gpio pin
  * 
  */
-enum class Detection {
+enum Detection : int {
     RISING = 0x0,
     FALLING,
     BOTH
