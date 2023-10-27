@@ -52,7 +52,7 @@ void Spi::transmit(std::vector<char> tx)
         .len = tx.size()
     };
     
-    int ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tx);
+    int ret = ioctl(fd, SPI_IOC_MESSAGE(1), &data);
 
     if(ret < 0)
         throw std::runtime_error("Cannot send spi message");
@@ -71,7 +71,7 @@ std::vector<char> Spi::transceive(std::vector<char> tx)
         .len = tx.size()
     };
     
-    int ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tx);
+    int ret = ioctl(fd, SPI_IOC_MESSAGE(1), &data);
 
     if(ret < 0)
         throw std::runtime_error("Cannot transceive spi message");
@@ -86,16 +86,16 @@ void Spi::set_speed(int speed)
     int ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
 
     if(ret < 0)
-        throw std::runtime_error("Could write mode");
+        throw std::runtime_error("Could write speed");
 }
 
-int Spi::get_speed(void)
+int Spi::get_speed(void) const
 {
     int speed;
     int ret = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
 
     if(ret < 0)
-        throw std::runtime_error("Could read mode");
+        throw std::runtime_error("Could read speed");
 
     return speed;
 }
@@ -110,7 +110,7 @@ void Spi::set_mode(int mode)
         throw std::runtime_error("Could write mode");
 }
 
-int Spi::get_mode(void)
+int Spi::get_mode(void) const
 {
     int mode;
     int ret = ioctl(fd, SPI_IOC_RD_MODE, &mode);
@@ -128,15 +128,15 @@ void Spi::set_lsb(bool lsb_first)
     int ret = ioctl(fd, SPI_IOC_WR_LSB_FIRST, &lsb_first);
 
     if(ret < 0)
-        throw std::runtime_error("Could write mode");}
+        throw std::runtime_error("Could write LSB mode");}
 
-bool Spi::get_lsb(void)
+bool Spi::get_lsb(void) const
 {
     int lsb_first;
     int ret = ioctl(fd, SPI_IOC_RD_LSB_FIRST, &lsb_first);
 
     if(ret < 0)
-        throw std::runtime_error("Could read bits per word");
+        throw std::runtime_error("Could read LSB mode");
 
     return lsb_first;
 }
@@ -148,10 +148,10 @@ void Spi::set_bits_per_word(int nbits)
     int ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &nbits);
 
     if(ret < 0)
-        throw std::runtime_error("Could write mode");
+        throw std::runtime_error("Could write bits per word");
 }
 
-int Spi::get_bits_per_word(void)
+int Spi::get_bits_per_word(void) const
 {
     int nbits;
     int ret = ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &nbits);

@@ -1,0 +1,6 @@
+[
+    {
+        "name": "Raspberry Pi",
+        "toolchainFile": "${workspaceFolder}/toolchain.cmake"
+    }
+]

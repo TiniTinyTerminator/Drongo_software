@@ -22,15 +22,15 @@ public:
     std::vector<char> transceive(const std::vector<char>);
 
     void set_speed(int);
-    int get_speed(void);
+    int get_speed(void) const;
 
     void set_mode(int);
-    int get_mode(void);
+    int get_mode(void) const;
 
     void set_lsb(bool);
-    bool get_lsb(void);
+    bool get_lsb(void) const;
 
     void set_bits_per_word(int);
-    int get_bits_per_word(void);
+    int get_bits_per_word(void) const;
 
 };

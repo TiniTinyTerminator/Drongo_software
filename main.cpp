@@ -1,15 +1,15 @@
 #include <iostream>
 
-#include "gpio.h"
+#include "gpiod.h"
 
 int main(int argc, char * argv[])
 {
 
     std::cout << "hello world!" << std::endl;
 
-    Gpio gpio("/dev/gpiochip0");
+    gpiod_chip *chip = gpiod_chip_open("/dev/chip");
 
-    gpio.set_direction(17, Direction::OUTPUT);
+    
 
     return 0;
 }
