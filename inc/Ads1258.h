@@ -4,6 +4,6 @@
 
 #include "spi.h"
 
-// class Ads1258 {
+class Ads1258 {
 
-// }
+}

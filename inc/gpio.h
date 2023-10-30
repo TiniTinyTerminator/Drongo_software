@@ -57,7 +57,6 @@ public:
     Values get_input(int line_id);
     
     void set_detection(int line_id, Detection detection);
-    void get_event_info(int line_id);
     bool wait_for_event(int line_id, std::chrono::nanoseconds timeout);
 
     void release_line(int line_id);

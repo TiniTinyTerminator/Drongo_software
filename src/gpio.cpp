@@ -76,10 +76,10 @@ Values Gpio::get_input(int line_id)
 
 void Gpio::set_detection(int line_id, Detection detection)
 {
-    gpiod_line *line = retrieve_gpiod_line(line_id);
+    gpiod_line *line = gpiod_chip_get_line(chip, line_id);
 
-    if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_INPUT)
-        throw std::runtime_error("requested line is not configured as input");
+    // if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_INPUT)
+    //     throw std::runtime_error("requested line is not configured as input");
 
     int ret;
 
@@ -125,11 +125,15 @@ bool Gpio::wait_for_event(int line_id, std::chrono::nanoseconds timeout)
         .tv_sec = static_cast<time_t>(secs.count()),
         .tv_nsec = static_cast<long>(nano.count())};
 
+    gpiod_line_event event;
+
     switch (gpiod_line_event_wait(line, &timeout_spec))
     {
     case 0:
+        gpiod_line_event_read(line, &event);
         return false;
     case 1:
+        gpiod_line_event_read(line, &event);
         return true;
     default:
         throw std::runtime_error("Could not detect for line " + std::to_string(line_id));

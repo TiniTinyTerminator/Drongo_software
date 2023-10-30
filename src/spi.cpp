@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
+
 Spi::Spi(std::filesystem::path dev) : device_file(dev)
 {
     fd = open(dev.c_str(), O_RDWR);
@@ -100,20 +101,20 @@ int Spi::get_speed(void) const
     return speed;
 }
 
-void Spi::set_mode(int mode)
+void Spi::set_mode(SpiModeConfig mode)
 {
     std::lock_guard guard(mtx);
 
-    int ret = ioctl(fd, SPI_IOC_WR_MODE, &mode);
+    int ret = ioctl(fd, SPI_IOC_WR_MODE, &mode.data);
 
     if(ret < 0)
         throw std::runtime_error("Could write mode");
 }
 
-int Spi::get_mode(void) const
+SpiModeConfig Spi::get_mode(void) const
 {
-    int mode;
-    int ret = ioctl(fd, SPI_IOC_RD_MODE, &mode);
+    SpiModeConfig mode;
+    int ret = ioctl(fd, SPI_IOC_RD_MODE, &mode.data);
 
     if(ret < 0)
         throw std::runtime_error("Could read mode");

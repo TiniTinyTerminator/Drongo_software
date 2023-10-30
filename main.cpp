@@ -1,30 +1,42 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <bitset>
+#include <typeinfo>
 
 #include "gpio.h"
+#include "spi.h"
+
+#include "easylogging++.h"
 
 using namespace std::chrono_literals;
 
+INITIALIZE_EASYLOGGINGPP
+
 int main(int argc, char *argv[])
 {
+    START_EASYLOGGINGPP(argc, argv);
 
-    std::cout << "hello world!" << std::endl;
+    el::Configurations logging_conf;
 
-    Gpio gpio("/dev/gpiochip0");
+    logging_conf.set(el::Level::Info, el::ConfigurationType::Format, "%datetime{%A %d/%M/%Y %H:%m:%s} (%level): %msg");
 
-    gpio.set_direction(16, Direction::OUTPUT);
+    el::Loggers::reconfigureAllLoggers(logging_conf);
 
-    while (true)
-    {
-        gpio.set_output(16, Values::HIGH);
-        std::cout << "high" << std::endl;
-        std::this_thread::sleep_for(500ms);
+    LOG(INFO) << "hello world!";
 
-        gpio.set_output(16, Values::LOW);
-        std::cout << "low" << std::endl;
-        std::this_thread::sleep_for(500ms);
-    }
-    
+    Spi spi("/dev/spidev0.0");
+
+    spi.set_speed(10e6);
+
+    LOG(INFO) << spi.get_speed();
+
+    SpiModeConfig config = MODE_1;
+
+
+    spi.set_mode(config);
+
+    LOG(INFO) << std::bitset<16>(spi.get_mode().data);
+
     return 0;
 }
