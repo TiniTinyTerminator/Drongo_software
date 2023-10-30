@@ -1,3 +1,17 @@
+/**
+ * @file spi.h
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-10-30
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
+#ifndef SPI_H
+#define SPI_H
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -62,3 +76,5 @@ public:
     void set_bits_per_word(int);
     int get_bits_per_word(void) const;
 };
+
+#endif

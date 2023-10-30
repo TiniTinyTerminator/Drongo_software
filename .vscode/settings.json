@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "/workspaces/debian/Drongo_software",
+    "cmake.sourceDirectory": "/workspaces/debian-2/Drongo_software",
     "C_Cpp.intelliSenseEngine": "default",
     "files.associations": {
         "*.h": "cpp",

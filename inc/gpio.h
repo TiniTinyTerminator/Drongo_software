@@ -1,3 +1,16 @@
+/**
+ * @file gpio.h
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-10-30
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
+#ifndef GPIO_H
+#define GPIO_H
 
 #include <gpiod.h>
 #include <filesystem>
@@ -63,3 +76,5 @@ public:
 
 };
 
+
+#endif

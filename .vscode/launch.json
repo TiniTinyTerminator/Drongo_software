@@ -16,8 +16,8 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb-multiarch",
-            "miDebuggerArgs": "-ex 'target extended-remote 192.168.1.153:4711'",
-            "miDebuggerServerAddress": "192.168.1.153:4711",
+            "miDebuggerArgs": "-ex 'target extended-remote 192.168.217.148:4711'",
+            "miDebuggerServerAddress": "192.168.217.148:4711",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

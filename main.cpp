@@ -1,11 +1,14 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <string>
 #include <bitset>
 #include <typeinfo>
 
 #include "gpio.h"
 #include "spi.h"
+#include "Ads1258.h"
+#include "RaspberryPiGPIO.h"
 
 #include "easylogging++.h"
 
@@ -25,18 +28,41 @@ int main(int argc, char *argv[])
 
     LOG(INFO) << "hello world!";
 
-    Spi spi("/dev/spidev0.0");
+    Ads1258 adc("/dev/spidev0.0", "/dev/gpiochip0");
 
-    spi.set_speed(10e6);
+    // Spi spi("/dev/spidev0.0");
 
-    LOG(INFO) << spi.get_speed();
+    // spi.set_speed(31200000);
 
-    SpiModeConfig config = MODE_1;
+    std::this_thread::sleep_for(50ms);
+
+    adc.pwdn(false);
+    adc.reset(false);
+    adc.start(true);
+
+    std::this_thread::sleep_for(50ms);
+
+    adc.enable_auto(true);
+
+    adc.enable_sleep_mode(false);
+
+    adc.enable_status(false);
+
+    adc.enable_auto(true);
+    adc.set_drate(DrateConfig::DRATE_7813SPS);
+    adc.set_delay(DelayConfig::DLY_0us);
+    adc.set_auto_single_channel({.channels = {.channel0 = true, .channel1 = true}});
 
 
-    spi.set_mode(config);
+    std::string str = std::string("hello, my name is max");
 
-    LOG(INFO) << std::bitset<16>(spi.get_mode().data);
+    while (true)
+    {
+
+        auto data = adc.get_data(); 
+        
+    }
+    
 
     return 0;
 }

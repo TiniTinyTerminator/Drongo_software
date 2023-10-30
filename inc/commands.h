@@ -1,3 +1,15 @@
+/**
+ * @file commands.h
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-10-30
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
+
 #ifndef ADS1258_H_
 #define ADS1258_H_
 
@@ -12,7 +24,7 @@
 //*****************************************************************************
 constexpr uint8_t NUM_REGISTERS = 10;
 
-enum class RegisterAdressses
+enum RegisterAdressses
 {
     CONFIG0 = 0x0,
     CONFIG1,
@@ -55,7 +67,7 @@ union CommandByte
         char command : 3;
     } bits;
 
-    unsigned char data;
+    char data;
 };
 
 /* SPI Commands */
@@ -63,8 +75,8 @@ enum Commands : char
 {
     READ_DIRECT = 0x0,
     READ_COMMAND = 0x1,
-    RREG = 0x2,
-    WREG = 0x3,
+    READ_REGISTERS = 0x2,
+    WRITE_REGISTERS = 0x3,
     PULSE_CONVERT = 0x4,
     RESET = 0x6
 };
@@ -93,7 +105,7 @@ union StatusByte
         bool NEW : 1;    // Bit 7
     } bits;
 
-    unsigned char data; // The full byte for direct access
+    char data; // The full byte for direct access
 };
 
 enum ChannelIdentifiers
@@ -149,16 +161,16 @@ union Config0
     struct
     {
         const bool zero1 : 1 = 0; // Bit 0, fixed at '0'
-        bool STAT : 1;            // Bit 1
-        bool CHOP : 1;            // Bit 2
-        bool CLKENB : 1;          // Bit 3
-        bool BYPAS : 1;           // Bit 4
-        bool MUXMOD : 1;          // Bit 5
-        bool SPIRST : 1;          // Bit 6
+        bool stat : 1;            // Bit 1
+        bool chop : 1;            // Bit 2
+        bool clken : 1;          // Bit 3
+        bool bypass : 1;           // Bit 4
+        bool muxmod : 1;          // Bit 5
+        bool spirst : 1;          // Bit 6
         const bool zero2 : 1 = 0; // Bit 7, fixed at '0'
     } bits;
 
-    unsigned char data; // The full byte for direct access
+    char data; // The full byte for direct access
 };
 
 constexpr Config0 CONFIG0_DEFAULT = {.data = 0x0A};
@@ -175,16 +187,16 @@ union Config1
 {
     struct
     {
-        char DRATE : 2;  // Bits 0-1
-        char SCBCS : 2;  // Bits 2-3
-        char DLY : 3;    // Bits 4-6
-        bool IDLMOD : 1; // Bit 7
+        char data_rate : 2;  // Bits 0-1
+        char scbcs : 2;  // Bits 2-3
+        char delay : 3;    // Bits 4-6
+        bool idle_mode : 1; // Bit 7
     } bits;
 
     char data; // The full byte for direct access
 };
 
-/** CONFIG1 default (reset; value */
+/** CONFIG1 default (reset) value */
 constexpr Config1 CONFIG1_DEFAULT = {.data = 0x83};
 
 /* DLY field values */
@@ -208,7 +220,7 @@ enum ScbcsConfig
     SCBCS_24uA
 };
 
-/* DRATE field values (fixed-channel DRs shown; */
+/* DRATE field values (fixed-channel DRs shown) */
 enum DrateConfig
 {
     DRATE_1953SPS = 0x00,
@@ -358,7 +370,7 @@ constexpr Sysred SYSRED_DEFAULT = {.data = 0x00};
  * ---------------------------------------------------------------------------------
  */
 
-union Gpio
+union GpioReg
 {
     struct
     {
@@ -375,10 +387,10 @@ union Gpio
     char data; // The full byte for direct access
 };
 
-typedef Gpio Gpioc;
-typedef Gpio Gpiod;
+typedef GpioReg Gpioc;
+typedef GpioReg Gpiod;
 
-/** GPIOC default (reset; value */
+/** GPIOC default (reset) value */
 constexpr Gpioc GPIOC_DEFAULT = {.data = 0xFF};
 
 /** GPIOD default (reset) value */
@@ -399,9 +411,9 @@ typedef union Id{
         const char start : 4;
         const char type : 1;
         const char end : 3;
-    };
+    } bits ;
     
-    char fullByte; // The full byte for direct access
+    char data; // The full byte for direct access
 } IdReg;
 
 /* ID4 field values */
