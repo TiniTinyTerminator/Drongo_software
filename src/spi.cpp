@@ -6,7 +6,6 @@
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
-
 Spi::Spi(std::filesystem::path dev) : device_file(dev)
 {
     fd = open(dev.c_str(), O_RDWR);

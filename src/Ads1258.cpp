@@ -10,7 +10,8 @@
  */
 
 #include <iostream>
-#include <type_traits>
+#include <bitset>
+#include <thread>
 
 #include "spi.h"
 #include "RaspberryPiGPIO.h"
@@ -18,7 +19,7 @@
 #include "Ads1258.h"
 
 using namespace RaspberryPi;
-
+using namespace std::chrono_literals;
 enum Pins
 {
     CLKSEL = PhysicalToBCM::PIN11,
@@ -77,13 +78,15 @@ union RawToInteger
 Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), channel_active(0x0)
 {
     _spi.set_mode(MODE_0);
-    _spi.set_speed(31200000);
+    _spi.set_speed(31.2e6);
     _spi.set_bits_per_word(8);
 
     _gpio.set_direction(Pins::CLKSEL, Direction::OUTPUT);
     _gpio.set_direction(Pins::START, Direction::OUTPUT);
     _gpio.set_direction(Pins::RST, Direction::OUTPUT);
     _gpio.set_direction(Pins::PWDN, Direction::OUTPUT);
+
+    _gpio.set_output(Pins::CLKSEL, Values::LOW);
 
     _gpio.set_detection(Pins::DRDY, Detection::FALLING);
 
@@ -114,7 +117,7 @@ void Ads1258::pwdn(bool pwdn)
 
 void Ads1258::reset(bool reset)
 {
-    _gpio.set_output(Pins::RST, reset ? HIGH : LOW);
+    _gpio.set_output(Pins::RST, reset ? LOW : HIGH);
 }
 
 void Ads1258::set_register(RegisterAdressses address, char data)
@@ -149,7 +152,7 @@ char Ads1258::get_register(RegisterAdressses address)
 
     message[0] = command.data;
 
-    return _spi.transceive(message).front();
+    return _spi.transceive(message)[1];
 }
 
 std::vector<char> Ads1258::get_all_registers(void)
@@ -381,38 +384,49 @@ std::vector<uint32_t> Ads1258::get_data(void)
     {
         std::vector<char> data = _spi.receive(4);
 
-        conversion_struct.bits.byte3 = shifted_byte_repair<char, -3>(data[3], data[2]);
-        conversion_struct.bits.byte2 = shifted_byte_repair<char, -3>(data[2], data[1]);
-        conversion_struct.bits.byte1 = shifted_byte_repair<char, -3>(data[1], data[0]);
+        conversion_struct.bits.byte3 = data[2];
+        conversion_struct.bits.byte2 = data[1];
+        conversion_struct.bits.byte1 = data[0];
 
         return {(uint32_t)conversion_struct.integer};
     }
     else
     {
-
         std::vector<uint32_t> data;
+
+        CommandByte command = {.bits = {.address = 0x0, .multiple=true, .command = Commands::READ_COMMAND}};
 
         std::vector<std::vector<char>> something;
 
-        for (int i = n_channels_active; i >= 1; i--)
+        std::cout << std::bitset<32>(channel_active) << std::endl;
+
+        for(uint8_t i = 0; i < 31; i++)
         {
-            something.push_back(_spi.receive(4));
+
+            if((channel_active & (1 << i)) == 0x0) continue;
+
+            std::cout << std::bitset<32>((1 << i)) << std::endl;
+
+            // command.bits.address = i;
+            something.push_back(_spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0, 0x0}));
+
+            std::this_thread::sleep_for(100us);
+
         }
 
-        for(int i = n_channels_active; i >= 1; i--)
+        for(int i = 0; i < something.size(); i++)
         {
-            std::vector<char> &data = something.front();
+            volatile StatusByte status = {.data = something[i][1]};
 
-            conversion_struct.bits.byte3 = shifted_byte_repair<char, -3>(data[3], data[2]);
-            conversion_struct.bits.byte2 = shifted_byte_repair<char, -3>(data[2], data[1]);
-            conversion_struct.bits.byte1 = shifted_byte_repair<char, -3>(data[1], data[0]);
-
-            data.push_back((uint32_t)conversion_struct.integer);
-
-            something.erase(something.begin());
+            std::cout << std::bitset<32>((1 << status.data)) << std::endl;
         }
 
         return data;
 
     }
+}
+
+bool Ads1258::await_data_ready(std::chrono::microseconds max_timeout)
+{
+    return _gpio.wait_for_event(Pins::DRDY, max_timeout);
 }

@@ -20,8 +20,6 @@
 
 #include "commands.h"
 
-
-
 typedef Muxsch FixedChannel;
 typedef GpioReg GpioDirection;
 typedef GpioReg GpioOutput;
@@ -94,11 +92,13 @@ private:
 
     std::map<RegisterAdressses, char> registers;
 
+
     void set_register(RegisterAdressses address, char data);
     void set_all_registers(void);
     char get_register(RegisterAdressses address);
     std::vector<char> get_all_registers(void);
-    
+
+
 public:
     Ads1258(std::filesystem::path spi, std::filesystem::path gpio);
     ~Ads1258();
@@ -129,6 +129,7 @@ public:
     GpioInput get_gpio_intput(void);
     Id get_id(void);
 
+    bool await_data_ready(std::chrono::microseconds max_timeout);
     std::vector<uint32_t> get_data(void);
 };
 

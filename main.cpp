@@ -38,29 +38,35 @@ int main(int argc, char *argv[])
 
     adc.pwdn(false);
     adc.reset(false);
-    adc.start(true);
 
     std::this_thread::sleep_for(50ms);
 
-    adc.enable_auto(true);
-
     adc.enable_sleep_mode(false);
-
-    adc.enable_status(false);
-
+    adc.enable_bypass(true);
+    adc.enable_status(true);
+    adc.enable_external_clock(false);
+    adc.set_drate(DrateConfig::DRATE_1953SPS);
+    adc.set_delay(DelayConfig::DLY_384us);
     adc.enable_auto(true);
-    adc.set_drate(DrateConfig::DRATE_7813SPS);
-    adc.set_delay(DelayConfig::DLY_0us);
-    adc.set_auto_single_channel({.channels = {.channel0 = true, .channel1 = true}});
 
+    adc.start(true);
 
-    std::string str = std::string("hello, my name is max");
+    adc.set_auto_single_channel({.channels = {.channel0 = true, .channel1 = true, .channel2 = true, .channel5 = true , .channel13 = true}});
+
+    auto tn = std::chrono::high_resolution_clock::now();
 
     while (true)
     {
+        adc.await_data_ready(10ms);
 
-        auto data = adc.get_data(); 
-        
+        std::vector<uint32_t> data = adc.get_data();
+
+    //     for(auto a : data)
+    //     {
+    //         std::cout << std::bitset<32>(a) << '\t';
+    //     }
+
+    //     std::cout << std::endl;
     }
     
 
