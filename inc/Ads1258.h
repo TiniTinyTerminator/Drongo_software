@@ -123,12 +123,9 @@ public:
     void set_auto_single_channel(SingleChannel channels);
     void set_auto_diff_channel(DiffChannel channels);
     void set_system_readings(SystemChannels channels);
-<<<<<<< HEAD
-=======
     
     void update_settings(void);
     bool verify_settings(void);
->>>>>>> 1c5eb30 (added readout of channels)
 
     void set_gpio_direction(GpioDirection channels);
     void set_gpio_output(GpioOutput outputs);
