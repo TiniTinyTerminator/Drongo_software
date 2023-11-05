@@ -92,7 +92,6 @@ private:
 
     std::map<RegisterAdressses, char> registers;
 
-
     void set_register(RegisterAdressses address, char data);
     void set_all_registers(void);
     char get_register(RegisterAdressses address);
