@@ -3,7 +3,7 @@
 #include <thread>
 #include <string>
 #include <bitset>
-#include <typeinfo>
+#include <cmath>
 
 #include "gpio.h"
 #include "spi.h"
@@ -51,22 +51,26 @@ int main(int argc, char *argv[])
 
     adc.start(true);
 
-    adc.set_auto_single_channel({.channels = {.channel0 = true, .channel1 = true, .channel2 = true, .channel5 = true , .channel13 = true}});
+    adc.set_auto_single_channel({.data = 0x000F});
 
-    auto tn = std::chrono::high_resolution_clock::now();
+    if(!adc.verify_settings()) throw std::runtime_error("registers incorrect");
+
+    auto t = std::chrono::high_resolution_clock::now();
+
+    adc.pwdn(false);
+    adc.reset(false);
 
     while (true)
     {
-        adc.await_data_ready(10ms);
+        // adc.await_data_ready(10ms);
 
         std::vector<uint32_t> data = adc.get_data();
 
-    //     for(auto a : data)
-    //     {
-    //         std::cout << std::bitset<32>(a) << '\t';
-    //     }
+        // std::this_thread::sleep_for(10ms);
+        auto tn = std::chrono::high_resolution_clock::now();
 
-    //     std::cout << std::endl;
+        std::cout << std::round(1.0e9 / (double)(tn - t).count()) << std::endl;
+        t = tn;
     }
     
 

@@ -1,12 +1,12 @@
 /**
  * @file Ads1258.cpp
  * @author your name (you@domain.com)
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-10-30
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
 #include <iostream>
@@ -40,7 +40,7 @@ int count_set_bits(int n)
     return count;
 }
 
-template <class T = char ,int shift>
+template <class T = char, int shift>
 constexpr T shifted_byte_repair(T first, T second)
 {
     static_assert(std::is_integral<T>::value, "Type T must be integral");
@@ -77,7 +77,7 @@ union RawToInteger
 
 Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), channel_active(0x0)
 {
-    _spi.set_mode(MODE_0);
+    _spi.set_mode(MODE_3);
     _spi.set_speed(31.2e6);
     _spi.set_bits_per_word(8);
 
@@ -260,7 +260,7 @@ void Ads1258::enable_sleep_mode(bool sleep_mode)
     cf1.bits.idle_mode = sleep_mode;
 
     set_register(RegisterAdressses::CONFIG1, cf1.data);
-
+ 
     registers[RegisterAdressses::CONFIG1] = cf1.data;
 }
 
@@ -368,6 +368,24 @@ GpioInput Ads1258::get_gpio_intput(void)
     return {.data = static_cast<char>((get_register(RegisterAdressses::GPIOD) & registers[RegisterAdressses::GPIOC]))};
 }
 
+bool Ads1258::verify_settings(void)
+{
+    std::vector<char> adc_data = get_all_registers();
+
+    for(auto r : registers)
+    {
+        if(adc_data[r.first + 1] != r.second)
+            return false;
+    }
+
+    return true;
+}
+
+void Ads1258::update_settings(void)
+{
+    set_all_registers();
+}
+
 Id Ads1258::get_id(void)
 {
     return {.data = get_register(RegisterAdressses::ID)};
@@ -375,55 +393,41 @@ Id Ads1258::get_id(void)
 
 std::vector<uint32_t> Ads1258::get_data(void)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
 
-    RawToInteger conversion_struct;
-    conversion_struct.bits.byte4 = 0x0;
+    std::vector<uint32_t> data;
 
-    if (cf0.bits.muxmod)
+    std::vector<std::vector<char>> something;
+
+    for (uint8_t i = 0; i < 32; i++)
     {
-        std::vector<char> data = _spi.receive(4);
+        if((channel_active & (1 << i)) == 0x0) continue;
 
-        conversion_struct.bits.byte3 = data[2];
-        conversion_struct.bits.byte2 = data[1];
-        conversion_struct.bits.byte1 = data[0];
+        CommandByte command = {.bits = {.address = 0, .multiple = false, .command = Commands::PULSE_CONVERT}};
 
-        return {(uint32_t)conversion_struct.integer};
+        _spi.transmit({command.data});
+
+        command.bits.command = Commands::READ_COMMAND;
+        command.bits.multiple = true;
+
+        this->await_data_ready(10ms);
+
+        std::vector<char> rx = _spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0});
+
+        volatile StatusByte status = {.data = rx[1]};
+
+        rx[0] = command.data;
+
+        something.push_back(rx);
     }
-    else
+
+    for (auto a : something)
     {
-        std::vector<uint32_t> data;
+        volatile StatusByte status = {.data = a[0]};
 
-        CommandByte command = {.bits = {.address = 0x0, .multiple=true, .command = Commands::READ_COMMAND}};
-
-        std::vector<std::vector<char>> something;
-
-        std::cout << std::bitset<32>(channel_active) << std::endl;
-
-        for(uint8_t i = 0; i < 31; i++)
-        {
-
-            if((channel_active & (1 << i)) == 0x0) continue;
-
-            std::cout << std::bitset<32>((1 << i)) << std::endl;
-
-            // command.bits.address = i;
-            something.push_back(_spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0, 0x0}));
-
-            std::this_thread::sleep_for(100us);
-
-        }
-
-        for(int i = 0; i < something.size(); i++)
-        {
-            volatile StatusByte status = {.data = something[i][1]};
-
-            std::cout << std::bitset<32>((1 << status.data)) << std::endl;
-        }
-
-        return data;
-
+        std::cout << (int)status.bits.CHID << std::endl;
     }
+
+    return data;
 }
 
 bool Ads1258::await_data_ready(std::chrono::microseconds max_timeout)
