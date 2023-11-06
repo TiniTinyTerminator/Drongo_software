@@ -1,14 +1,13 @@
 /**
  * @file commands.h
  * @author your name (you@domain.com)
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-10-30
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
-
 
 #ifndef ADS1258_H_
 #define ADS1258_H_
@@ -163,17 +162,17 @@ union Config0
         const bool zero1 : 1 = 0; // Bit 0, fixed at '0'
         bool stat : 1;            // Bit 1
         bool chop : 1;            // Bit 2
-        bool clken : 1;          // Bit 3
-        bool bypass : 1;           // Bit 4
+        bool clken : 1;           // Bit 3
+        bool bypass : 1;          // Bit 4
         bool muxmod : 1;          // Bit 5
         bool spirst : 1;          // Bit 6
         const bool zero2 : 1 = 0; // Bit 7, fixed at '0'
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
-constexpr Config0 CONFIG0_DEFAULT = {.data = 0x0A};
+constexpr Config0 CONFIG0_DEFAULT = {.raw_data = 0x0A};
 
 /* Register 0x01 (CONFIG1; definition
  * ---------------------------------------------------------------------------------
@@ -187,17 +186,17 @@ union Config1
 {
     struct
     {
-        char data_rate : 2;  // Bits 0-1
-        char scbcs : 2;  // Bits 2-3
-        char delay : 3;    // Bits 4-6
+        char data_rate : 2; // Bits 0-1
+        char scbcs : 2;     // Bits 2-3
+        char delay : 3;     // Bits 4-6
         bool idle_mode : 1; // Bit 7
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 /** CONFIG1 default (reset) value */
-constexpr Config1 CONFIG1_DEFAULT = {.data = 0x83};
+constexpr Config1 CONFIG1_DEFAULT = {.raw_data = 0x83};
 
 /* DLY field values */
 enum DelayConfig
@@ -245,11 +244,11 @@ union Muxsch
         char AINP : 4; // Bits 4-7
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 /* MUXSCH default */
-constexpr Muxsch MUXSCH_DEFAULT = {.data = 0x00};
+constexpr Muxsch MUXSCH_DEFAULT = {.raw_data = 0x00};
 
 /* Register 0x03 (MUXDIF) definition
  * ---------------------------------------------------------------------------------
@@ -273,11 +272,11 @@ union Muxdif
         bool DIFF7 : 1; // Bit 7
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 /** MUXDIF default (reset; value */
-constexpr Muxdif MUXDIF_DEFAULT = {.data = 0x00};
+constexpr Muxdif MUXDIF_DEFAULT = {.raw_data = 0x00};
 
 /* Register 0x04 (MUXSG0) definition
  * ---------------------------------------------------------------------------------
@@ -301,11 +300,11 @@ union Muxsg0
         bool AIN7 : 1; // Bit 7
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 /** MUXSG0 default (reset) value */
-constexpr Muxsg0 MUXSG0_DEFAULT = {.data = 0xFF};
+constexpr Muxsg0 MUXSG0_DEFAULT = {.raw_data = 0xFF};
 
 /* Register 0x05 (MUXSG1) definition
  * ---------------------------------------------------------------------------------
@@ -329,11 +328,11 @@ union Muxsg1
         bool AIN15 : 1; // Bit 7
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 /** MUXSG1 default (reset) value */
-constexpr Muxsg1 MUXSG1_DEFAULT = {.data = 0xFF};
+constexpr Muxsg1 MUXSG1_DEFAULT = {.raw_data = 0xFF};
 
 /* Register 0x06 (SYSRED) definition
  * ---------------------------------------------------------------------------------
@@ -356,11 +355,11 @@ union Sysred
         const bool zero2 : 2 = 0; // Bits 6-7, fixed at '0'
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 /** SYSRED default (reset) value */
-constexpr Sysred SYSRED_DEFAULT = {.data = 0x00};
+constexpr Sysred SYSRED_DEFAULT = {.raw_data = 0x00};
 
 /* Register 0x07 & 0x08 (GPIOC & GPIOD) definition
  * ---------------------------------------------------------------------------------
@@ -384,17 +383,17 @@ union GpioReg
         bool gpio8 : 1;
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 typedef GpioReg Gpioc;
 typedef GpioReg Gpiod;
 
 /** GPIOC default (reset) value */
-constexpr Gpioc GPIOC_DEFAULT = {.data = 0xFF};
+constexpr Gpioc GPIOC_DEFAULT = {.raw_data = 0xFF};
 
 /** GPIOD default (reset) value */
-constexpr Gpiod GPIOD_DEFAULT = {.data = 0x00};
+constexpr Gpiod GPIOD_DEFAULT = {.raw_data = 0x00};
 
 /* Register 0x09 (ID) definition
  * ---------------------------------------------------------------------------------
@@ -405,16 +404,18 @@ constexpr Gpiod GPIOD_DEFAULT = {.data = 0x00};
  */
 
 // Define a union that represents your ID register
-typedef union Id{
+union IdReg
+{
 
-    struct {
+    struct
+    {
         const char start : 4;
         const char type : 1;
         const char end : 3;
-    } bits ;
-    
-    char data; // The full byte for direct access
-} IdReg;
+    } bits;
+
+    char raw_data; // The full byte for direct access
+};
 
 /* ID4 field values */
 constexpr uint8_t ADS1258_ID = 0x00;

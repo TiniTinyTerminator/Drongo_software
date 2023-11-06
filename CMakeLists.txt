@@ -4,6 +4,20 @@ project(Drongo_software)
 
 include(FetchContent)
 
+# FetchContent_Declare(
+#     portaudio
+#     GIT_REPOSITORY https://github.com/PortAudio/portaudio.git
+#     GIT_TAG v19.7.0
+# )
+
+# FetchContent_GetProperties(portaudio)
+
+# if(NOT portaudio_POPULATED)
+#     FetchContent_Populate(portaudio)
+
+#     add_subdirectory(${portaudio_SOURCE_DIR} ${portaudio_BINARY_DIR})
+# endif()
+
 FetchContent_Declare(
     easyloggingpp
     GIT_REPOSITORY https://github.com/amrayn/easyloggingpp.git

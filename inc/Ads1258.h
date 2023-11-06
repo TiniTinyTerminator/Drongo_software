@@ -14,16 +14,46 @@
 
 #include <vector>
 #include <map>
+#include <cmath>
 
 #include "spi.h"
 #include "gpio.h"
-
 #include "commands.h"
+
+constexpr double ADC_MAX_VOLTAGE = 2.5;
+constexpr double ADC_RAW_TO_DOUBLE_RATIO = ADC_MAX_VOLTAGE / (1 << 23);
+
+enum AutoDataRates {
+    AUTO_DRATE0 = 1831,
+    AUTO_DRATE1 = 6168,
+    AUTO_DRATE2 = 15123,
+    AUTO_DRATE3 = 23739
+};
+
+enum FixedDataRates {
+    FIXED_DRATE0 = 1953,
+    FIXED_DRATE1 = 7813,
+    FIXED_DRATE2 = 31250,
+    FIXED_DRATE3 = 125000
+};
+
+enum DelaysInMicroseconds {
+    DLY0 = 0,
+    DLY1 = 8,
+    DLY2 = 16,
+    DLY3 = 32,
+    DLY4 = 64,
+    DLY5 = 128,
+    DLY6 = 256,
+    DLY7 = 384
+};
 
 typedef Muxsch FixedChannel;
 typedef GpioReg GpioDirection;
 typedef GpioReg GpioOutput;
 typedef GpioReg GpioInput;
+
+typedef std::pair<char, int32_t> ChannelData;
 
 union SingleChannel
 {
@@ -46,7 +76,7 @@ union SingleChannel
         bool channel15 : 1;
     } channels;
 
-    uint16_t data;
+    uint16_t raw_data;
 };
 
 union DiffChannel
@@ -62,7 +92,7 @@ union DiffChannel
         bool channel7 : 1;
     } channels;
 
-    uint16_t data;
+    uint16_t raw_data;
 };
 
 union SystemChannels
@@ -79,17 +109,28 @@ union SystemChannels
 
     } channels;
 
-    uint16_t data;
+    uint16_t raw_data;
 };
+
+constexpr double channel_drate_delay_to_frequency(double n_channels, double drate, double delay_us)
+{
+    if(n_channels > 15)
+        throw std::invalid_argument("number of channels cannot be bigger than 15");
+    
+    double time = 1 / drate + delay_us * 1E-6;
+
+    return 1 / (time * n_channels);
+}
 
 class Ads1258 {
 private:
     Spi _spi;
     Gpio _gpio;
 
-    uint32_t channel_active;
-    uint8_t n_channels_active;
-
+    uint32_t _channels_active;
+    uint8_t _n_channels_active;
+    uint8_t _current_channel;
+    
     std::map<RegisterAdressses, char> registers;
 
     void set_register(RegisterAdressses address, char data);
@@ -97,6 +138,8 @@ private:
     char get_register(RegisterAdressses address);
     std::vector<char> get_all_registers(void);
 
+    void reset_local_registers(void);
+    void reset_channel_data(void);
 
 public:
     Ads1258(std::filesystem::path spi, std::filesystem::path gpio);
@@ -129,10 +172,10 @@ public:
     void set_gpio_direction(GpioDirection channels);
     void set_gpio_output(GpioOutput outputs);
     GpioInput get_gpio_intput(void);
-    Id get_id(void);
+    IdReg get_id(void);
 
     bool await_data_ready(std::chrono::microseconds max_timeout);
-    std::vector<uint32_t> get_data(void);
+    ChannelData get_data(void);
 };
 
 #endif

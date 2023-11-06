@@ -20,6 +20,7 @@
 
 using namespace RaspberryPi;
 using namespace std::chrono_literals;
+
 enum Pins
 {
     CLKSEL = PhysicalToBCM::PIN11,
@@ -27,6 +28,19 @@ enum Pins
     DRDY = PhysicalToBCM::PIN13,
     START = PhysicalToBCM::PIN15,
     PWDN = PhysicalToBCM::PIN16
+};
+
+union BytesToInteger
+{
+    struct
+    {
+        char byte1 : 8;
+        char byte2 : 8;
+        char byte3 : 8;
+        char byte4 : 8;
+    } bytes;
+
+    int integer;
 };
 
 int count_set_bits(int n)
@@ -40,45 +54,10 @@ int count_set_bits(int n)
     return count;
 }
 
-template <class T = char, int shift>
-constexpr T shifted_byte_repair(T first, T second)
-{
-    static_assert(std::is_integral<T>::value, "Type T must be integral");
-
-    constexpr int8_t max_shift = sizeof(T) * 8;
-
-    static_assert(shift >= -max_shift && shift <= max_shift, "Shift value out of allowed range!");
-
-    constexpr T lrem_mask = T(1 << max_shift) - 1 >> abs(shift);
-    constexpr T rrem_mask = T(1 << max_shift) - 1 << abs(shift);
-
-    if (shift < 0)
-    {
-        return (first & lrem_mask) << abs(shift) | (second & rrem_mask);
-    }
-    else
-    {
-        return (first & lrem_mask) | (second & rrem_mask) >> abs(shift);
-    }
-}
-
-union RawToInteger
-{
-    struct
-    {
-        char byte1 : 8;
-        char byte2 : 8;
-        char byte3 : 8;
-        char byte4 : 8;
-    } bits;
-
-    int integer;
-};
-
-Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), channel_active(0x0)
+Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), _channels_active(0x0)
 {
     _spi.set_mode(MODE_3);
-    _spi.set_speed(31.2e6);
+    _spi.set_speed(8e6);
     _spi.set_bits_per_word(8);
 
     _gpio.set_direction(Pins::CLKSEL, Direction::OUTPUT);
@@ -90,15 +69,27 @@ Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(s
 
     _gpio.set_detection(Pins::DRDY, Detection::FALLING);
 
-    registers[RegisterAdressses::CONFIG0] = CONFIG0_DEFAULT.data;
-    registers[RegisterAdressses::CONFIG1] = CONFIG1_DEFAULT.data;
-    registers[RegisterAdressses::MUXSCH] = MUXSCH_DEFAULT.data;
-    registers[RegisterAdressses::MUXDIF] = MUXDIF_DEFAULT.data;
-    registers[RegisterAdressses::MUXSG0] = MUXSG0_DEFAULT.data;
-    registers[RegisterAdressses::MUXSG1] = MUXSG1_DEFAULT.data;
-    registers[RegisterAdressses::GPIOC] = GPIOC_DEFAULT.data;
-    registers[RegisterAdressses::GPIOD] = GPIOD_DEFAULT.data;
-    registers[RegisterAdressses::SYSRED] = SYSRED_DEFAULT.data;
+    reset_local_registers();
+}
+
+void Ads1258::reset_local_registers(void)
+{
+    registers[RegisterAdressses::CONFIG0] = CONFIG0_DEFAULT.raw_data;
+    registers[RegisterAdressses::CONFIG1] = CONFIG1_DEFAULT.raw_data;
+    registers[RegisterAdressses::MUXSCH] = MUXSCH_DEFAULT.raw_data;
+    registers[RegisterAdressses::MUXDIF] = MUXDIF_DEFAULT.raw_data;
+    registers[RegisterAdressses::MUXSG0] = MUXSG0_DEFAULT.raw_data;
+    registers[RegisterAdressses::MUXSG1] = MUXSG1_DEFAULT.raw_data;
+    registers[RegisterAdressses::GPIOC] = GPIOC_DEFAULT.raw_data;
+    registers[RegisterAdressses::GPIOD] = GPIOD_DEFAULT.raw_data;
+    registers[RegisterAdressses::SYSRED] = SYSRED_DEFAULT.raw_data;
+}
+
+void Ads1258::reset_channel_data(void)
+{
+    _channels_active = 0;
+    _current_channel = 0;
+    _n_channels_active = 0;
 }
 
 Ads1258::~Ads1258()
@@ -108,16 +99,34 @@ Ads1258::~Ads1258()
 void Ads1258::start(bool start)
 {
     _gpio.set_output(Pins::START, start ? HIGH : LOW);
-}
+
+    if (_gpio.get_input(Pins::START) == LOW)
+    {
+        reset_channel_data();
+    }}
 
 void Ads1258::pwdn(bool pwdn)
 {
     _gpio.set_output(Pins::PWDN, pwdn ? LOW : HIGH);
+
+    _current_channel = 0 ? _gpio.get_input(Pins::PWDN) == HIGH : _current_channel;
+
+    if (_gpio.get_input(Pins::PWDN) == HIGH)
+    {
+        reset_local_registers();
+        reset_channel_data();
+    }
 }
 
 void Ads1258::reset(bool reset)
 {
     _gpio.set_output(Pins::RST, reset ? LOW : HIGH);
+
+    if (_gpio.get_input(Pins::RST) == LOW)
+    {
+        reset_local_registers();
+        reset_channel_data();
+    }
 }
 
 void Ads1258::set_register(RegisterAdressses address, char data)
@@ -127,6 +136,8 @@ void Ads1258::set_register(RegisterAdressses address, char data)
     std::vector<char> message = {command.data, data};
 
     _spi.transmit(message);
+
+    _current_channel = 0;
 }
 
 void Ads1258::set_all_registers(void)
@@ -168,213 +179,213 @@ std::vector<char> Ads1258::get_all_registers(void)
 
 void Ads1258::enable_auto(bool enable_auto)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
+    Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
     if (cf0.bits.muxmod == !enable_auto)
         return;
 
     cf0.bits.muxmod = !enable_auto;
 
-    set_register(RegisterAdressses::CONFIG0, cf0.data);
+    set_register(RegisterAdressses::CONFIG0, cf0.raw_data);
 
-    registers[RegisterAdressses::CONFIG0] = cf0.data;
+    registers[RegisterAdressses::CONFIG0] = cf0.raw_data;
 }
 
 void Ads1258::enable_chop(bool enable_chop)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
+    Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
     if (cf0.bits.chop == enable_chop)
         return;
 
     cf0.bits.chop = enable_chop;
 
-    set_register(RegisterAdressses::CONFIG0, cf0.data);
+    set_register(RegisterAdressses::CONFIG0, cf0.raw_data);
 
-    registers[RegisterAdressses::CONFIG0] = cf0.data;
+    registers[RegisterAdressses::CONFIG0] = cf0.raw_data;
 }
 
 void Ads1258::enable_quick_spi_reset(bool enable_rst)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
+    Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
     if (cf0.bits.spirst == enable_rst)
         return;
 
     cf0.bits.spirst = enable_rst;
 
-    set_register(RegisterAdressses::CONFIG0, cf0.data);
+    set_register(RegisterAdressses::CONFIG0, cf0.raw_data);
 
-    registers[RegisterAdressses::CONFIG0] = cf0.data;
+    registers[RegisterAdressses::CONFIG0] = cf0.raw_data;
 }
 
 void Ads1258::enable_bypass(bool enable_bypass)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
+    Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
     if (cf0.bits.bypass == enable_bypass)
         return;
 
     cf0.bits.bypass = enable_bypass;
 
-    set_register(RegisterAdressses::CONFIG0, cf0.data);
+    set_register(RegisterAdressses::CONFIG0, cf0.raw_data);
 
-    registers[RegisterAdressses::CONFIG0] = cf0.data;
+    registers[RegisterAdressses::CONFIG0] = cf0.raw_data;
 }
 
 void Ads1258::enable_external_clock(bool external_clk)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
+    Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
     if (cf0.bits.clken == external_clk)
         return;
 
     cf0.bits.clken = external_clk;
 
-    set_register(RegisterAdressses::CONFIG0, cf0.data);
+    set_register(RegisterAdressses::CONFIG0, cf0.raw_data);
 
-    registers[RegisterAdressses::CONFIG0] = cf0.data;
+    registers[RegisterAdressses::CONFIG0] = cf0.raw_data;
 }
 
 void Ads1258::enable_status(bool enable_stats)
 {
-    Config0 cf0 = {.data = registers[RegisterAdressses::CONFIG0]};
+    Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
     if (cf0.bits.stat == enable_stats)
         return;
 
     cf0.bits.stat = enable_stats;
 
-    set_register(RegisterAdressses::CONFIG0, cf0.data);
+    set_register(RegisterAdressses::CONFIG0, cf0.raw_data);
 
-    registers[RegisterAdressses::CONFIG0] = cf0.data;
+    registers[RegisterAdressses::CONFIG0] = cf0.raw_data;
 }
 
 void Ads1258::enable_sleep_mode(bool sleep_mode)
 {
-    Config1 cf1 = {.data = registers[RegisterAdressses::CONFIG1]};
+    Config1 cf1 = {.raw_data = registers[RegisterAdressses::CONFIG1]};
 
     if (cf1.bits.idle_mode == sleep_mode)
         return;
 
     cf1.bits.idle_mode = sleep_mode;
 
-    set_register(RegisterAdressses::CONFIG1, cf1.data);
- 
-    registers[RegisterAdressses::CONFIG1] = cf1.data;
+    set_register(RegisterAdressses::CONFIG1, cf1.raw_data);
+
+    registers[RegisterAdressses::CONFIG1] = cf1.raw_data;
 }
 
 void Ads1258::set_drate(DrateConfig drate)
 {
-    Config1 cf1 = {.data = registers[RegisterAdressses::CONFIG1]};
+    Config1 cf1 = {.raw_data = registers[RegisterAdressses::CONFIG1]};
 
     if (cf1.bits.data_rate == drate)
         return;
 
     cf1.bits.data_rate = drate;
 
-    set_register(RegisterAdressses::CONFIG1, cf1.data);
+    set_register(RegisterAdressses::CONFIG1, cf1.raw_data);
 
-    registers[RegisterAdressses::CONFIG1] = cf1.data;
+    registers[RegisterAdressses::CONFIG1] = cf1.raw_data;
 }
 
 void Ads1258::set_scbcs(ScbcsConfig scbcs)
 {
-    Config1 cf1 = {.data = registers[RegisterAdressses::CONFIG1]};
+    Config1 cf1 = {.raw_data = registers[RegisterAdressses::CONFIG1]};
 
     if (cf1.bits.scbcs == scbcs)
         return;
 
     cf1.bits.scbcs = scbcs;
 
-    set_register(RegisterAdressses::CONFIG1, cf1.data);
+    set_register(RegisterAdressses::CONFIG1, cf1.raw_data);
 
-    registers[RegisterAdressses::CONFIG1] = cf1.data;
+    registers[RegisterAdressses::CONFIG1] = cf1.raw_data;
 }
 
 void Ads1258::set_delay(DelayConfig delay)
 {
-    Config1 cf1 = {.data = registers[RegisterAdressses::CONFIG1]};
+    Config1 cf1 = {.raw_data = registers[RegisterAdressses::CONFIG1]};
 
     if (cf1.bits.delay == delay)
         return;
 
     cf1.bits.delay = delay;
 
-    set_register(RegisterAdressses::CONFIG1, cf1.data);
+    set_register(RegisterAdressses::CONFIG1, cf1.raw_data);
 
-    registers[RegisterAdressses::CONFIG1] = cf1.data;
+    registers[RegisterAdressses::CONFIG1] = cf1.raw_data;
 }
 
 void Ads1258::set_fixed_channel(FixedChannel channel)
 {
-    registers[RegisterAdressses::MUXSCH] = channel.data;
+    registers[RegisterAdressses::MUXSCH] = channel.raw_data;
 
-    set_register(RegisterAdressses::MUXSCH, channel.data);
+    set_register(RegisterAdressses::MUXSCH, channel.raw_data);
 }
 
 void Ads1258::set_auto_single_channel(SingleChannel channels)
 {
-    registers[RegisterAdressses::MUXSG0] = channels.data;
-    registers[RegisterAdressses::MUXSG1] = channels.data >> 8;
+    registers[RegisterAdressses::MUXSG0] = channels.raw_data;
+    registers[RegisterAdressses::MUXSG1] = channels.raw_data >> 8;
 
-    channel_active = ((uint32_t)(channels.data) << 8) | (~0xFFFF & channel_active);
+    _channels_active = ((uint32_t)(channels.raw_data) << 8) | (~0xFFFF & _channels_active);
 
-    n_channels_active = count_set_bits(channel_active);
+    _n_channels_active = count_set_bits(_channels_active);
 
-    set_register(RegisterAdressses::MUXSG0, channels.data);
-    set_register(RegisterAdressses::MUXSG1, channels.data >> 8);
+    set_register(RegisterAdressses::MUXSG0, channels.raw_data);
+    set_register(RegisterAdressses::MUXSG1, channels.raw_data >> 8);
 }
 
 void Ads1258::set_auto_diff_channel(DiffChannel channels)
 {
-    registers[RegisterAdressses::MUXDIF] = channels.data;
+    registers[RegisterAdressses::MUXDIF] = channels.raw_data;
 
-    channel_active = channels.data | (~0xFF & channel_active);
+    _channels_active = channels.raw_data | (~0xFF & _channels_active);
 
-    n_channels_active = count_set_bits(channel_active);
+    _n_channels_active = count_set_bits(_channels_active);
 
-    set_register(RegisterAdressses::MUXDIF, channels.data);
+    set_register(RegisterAdressses::MUXDIF, channels.raw_data);
 }
 
 void Ads1258::set_system_readings(SystemChannels channels)
 {
-    registers[RegisterAdressses::SYSRED] = channels.data;
+    registers[RegisterAdressses::SYSRED] = channels.raw_data;
 
-    channel_active = channels.channels.offset << 24 | (~(0x1 << 24) & channel_active);
-    channel_active = channels.data << (25 - 2) | (~(0b1111 << 25) & channel_active);
+    _channels_active = channels.channels.offset << 24 | (~(0x1 << 24) & _channels_active);
+    _channels_active = channels.raw_data << (25 - 2) | (~(0b1111 << 25) & _channels_active);
 
-    n_channels_active = count_set_bits(channel_active);
+    _n_channels_active = count_set_bits(_channels_active);
 
-    set_register(RegisterAdressses::SYSRED, channels.data);
+    set_register(RegisterAdressses::SYSRED, channels.raw_data);
 }
 
 void Ads1258::set_gpio_direction(GpioDirection channels)
 {
-    registers[RegisterAdressses::GPIOC] = channels.data;
+    registers[RegisterAdressses::GPIOC] = channels.raw_data;
 
-    set_register(RegisterAdressses::GPIOC, channels.data);
+    set_register(RegisterAdressses::GPIOC, channels.raw_data);
 }
 
 void Ads1258::set_gpio_output(GpioOutput outputs)
 {
-    registers[RegisterAdressses::GPIOD] = outputs.data & ~registers[RegisterAdressses::GPIOC];
+    registers[RegisterAdressses::GPIOD] = outputs.raw_data & ~registers[RegisterAdressses::GPIOC];
 
-    set_register(RegisterAdressses::GPIOD, outputs.data);
+    set_register(RegisterAdressses::GPIOD, outputs.raw_data);
 }
 
 GpioInput Ads1258::get_gpio_intput(void)
 {
-    return {.data = static_cast<char>((get_register(RegisterAdressses::GPIOD) & registers[RegisterAdressses::GPIOC]))};
+    return {.raw_data = static_cast<char>((get_register(RegisterAdressses::GPIOD) & registers[RegisterAdressses::GPIOC]))};
 }
 
 bool Ads1258::verify_settings(void)
 {
     std::vector<char> adc_data = get_all_registers();
 
-    for(auto r : registers)
+    for (auto r : registers)
     {
-        if(adc_data[r.first + 1] != r.second)
+        if (adc_data[r.first + 1] != r.second)
             return false;
     }
 
@@ -386,48 +397,29 @@ void Ads1258::update_settings(void)
     set_all_registers();
 }
 
-Id Ads1258::get_id(void)
+IdReg Ads1258::get_id(void)
 {
-    return {.data = get_register(RegisterAdressses::ID)};
+    return {.raw_data = get_register(RegisterAdressses::ID)};
 }
 
-std::vector<uint32_t> Ads1258::get_data(void)
+ChannelData Ads1258::get_data(void)
 {
+    constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_COMMAND}};
 
-    std::vector<uint32_t> data;
+    Config0 cf0 = {.raw_data = get_register(RegisterAdressses::CONFIG0)};
 
-    std::vector<std::vector<char>> something;
-
-    for (uint8_t i = 0; i < 32; i++)
+    if (cf0.bits.stat)
     {
-        if((channel_active & (1 << i)) == 0x0) continue;
-
-        CommandByte command = {.bits = {.address = 0, .multiple = false, .command = Commands::PULSE_CONVERT}};
-
-        _spi.transmit({command.data});
-
-        command.bits.command = Commands::READ_COMMAND;
-        command.bits.multiple = true;
-
-        this->await_data_ready(10ms);
-
         std::vector<char> rx = _spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0});
 
-        volatile StatusByte status = {.data = rx[1]};
+        StatusByte stats = {.data = rx[1]};
 
-        rx[0] = command.data;
+        int32_t value = (int32_t)((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24));
 
-        something.push_back(rx);
+        value >>= 8;
+
+        return {static_cast<char>(stats.bits.CHID), value};
     }
-
-    for (auto a : something)
-    {
-        volatile StatusByte status = {.data = a[0]};
-
-        std::cout << (int)status.bits.CHID << std::endl;
-    }
-
-    return data;
 }
 
 bool Ads1258::await_data_ready(std::chrono::microseconds max_timeout)

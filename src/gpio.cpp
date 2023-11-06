@@ -68,8 +68,8 @@ Values Gpio::get_input(int line_id)
 {
     gpiod_line *line = retrieve_gpiod_line(line_id);
 
-    if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_INPUT)
-        throw std::runtime_error("requested line is not configured as input");
+    // if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_INPUT)
+    //     throw std::runtime_error("requested line is not configured as input");
 
     return gpiod_line_get_value(line) ? Values::HIGH : Values::LOW;
 }
