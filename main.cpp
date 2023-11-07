@@ -65,38 +65,40 @@ int main(int argc, char *argv[])
 
     WAVWriter writer(3, channel_drate_delay_to_frequency(3, AUTO_DRATE2, DLY4), 24);
 
-    writer.open_file("dada.wav");
-
     auto tstart = std::chrono::high_resolution_clock::now();
 
-    auto t = tstart;
+    writer.open_file("dada.wav");
+    writer.set_comments("hello :D");
+    writer.set_datetime(tstart);
 
-    LOG(INFO) << "starting sampling";
+    // auto t = tstart;
 
-    adc.start(true);
+    // LOG(INFO) << "starting sampling";
 
-    while (true)
-    {
-        std::map<char, int32_t> adc_data;
-        std::vector<int32_t> samples;
+    // adc.start(true);
 
-        for(uint32_t i = 0; i < 3; i++)
-        {
-            adc.await_data_ready(10ms);
+    // while (true)
+    // {
+    //     std::map<char, int32_t> adc_data;
+    //     std::vector<int32_t> samples;
 
-            ChannelData data = adc.get_data();
+    //     for(uint32_t i = 0; i < 3; i++)
+    //     {
+    //         adc.await_data_ready(10ms);
 
-            samples.push_back(data.second);
-        }
+    //         ChannelData data = adc.get_data();
 
-        if(samples.size() != 3) continue;
+    //         samples.push_back(data.second);
+    //     }
 
-        writer.write_channels(samples);
+    //     if(samples.size() != 3) continue;
 
-        auto tn = std::chrono::high_resolution_clock::now();
+    //     writer.write_channels(samples);
 
-        if(tn - t > 10s) break;
-    }
+    //     auto tn = std::chrono::high_resolution_clock::now();
+
+    //     if(tn - t > 3s) break;
+    // }
 
     writer.close_file();
 
