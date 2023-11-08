@@ -1,12 +1,12 @@
 /**
  * @file RaspberryPiGPIO.h
  * @author your name (you@domain.com)
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-10-30
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
 #ifndef RASPBERRY_PI_GPIO_H

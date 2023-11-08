@@ -112,11 +112,8 @@ union SystemChannels
     uint16_t raw_data;
 };
 
-constexpr double channel_drate_delay_to_frequency(double n_channels, double drate, double delay_us)
-{
-    if(n_channels > 15)
-        throw std::invalid_argument("number of channels cannot be bigger than 15");
-    
+constexpr double channel_drate_delay_to_frequency(const double n_channels, const double drate, const double delay_us)
+{    
     double time = 1 / drate + delay_us * 1E-6;
 
     return 1 / (time * n_channels);
@@ -174,8 +171,9 @@ public:
     GpioInput get_gpio_intput(void);
     IdReg get_id(void);
 
-    bool await_data_ready(std::chrono::microseconds max_timeout);
-    ChannelData get_data(void);
+    bool await_data_ready(void);
+    ChannelData get_data_read(void);
+    ChannelData get_data_direct(void);
 };
 
 #endif

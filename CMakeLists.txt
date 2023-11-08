@@ -4,20 +4,6 @@ project(Drongo_software)
 
 include(FetchContent)
 
-# FetchContent_Declare(
-#     portaudio
-#     GIT_REPOSITORY https://github.com/PortAudio/portaudio.git
-#     GIT_TAG v19.7.0
-# )
-
-# FetchContent_GetProperties(portaudio)
-
-# if(NOT portaudio_POPULATED)
-#     FetchContent_Populate(portaudio)
-
-#     add_subdirectory(${portaudio_SOURCE_DIR} ${portaudio_BINARY_DIR})
-# endif()
-
 FetchContent_Declare(
     easyloggingpp
     GIT_REPOSITORY https://github.com/amrayn/easyloggingpp.git
@@ -66,6 +52,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+message(STATUS "${CMAKE_C_COMPILER}")
+
+# if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64") 
+    # Set compiler optimization flags for ARM
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mtune=cortex-a72")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mtune=cortex-a72")
+# endif()
+
 set(SRC "src")
 set(INC "inc")
 
@@ -89,6 +83,10 @@ add_library(Ads1258_class STATIC
     "${SRC}/Ads1258.cpp"
 )
 
+add_library(WAVwriter_class STATIC
+    "${SRC}/WAVwriter.cpp"
+)
+
 target_link_libraries(Ads1258_class PRIVATE gpio_class spi_class)
 
-target_link_libraries(Drongo_software PRIVATE  Ads1258_class Threads::Threads easyloggingpp inih)
+target_link_libraries(Drongo_software PRIVATE  Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class)

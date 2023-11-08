@@ -2,6 +2,8 @@
 
 #include "gpio.h"
 
+timespec timeout_spec = {.tv_sec = 1, .tv_nsec = 0};
+
 Gpio::Gpio(std::filesystem::path dev) : device_file(dev)
 {
     setup();
@@ -102,15 +104,8 @@ void Gpio::set_detection(int line_id, Detection detection)
         throw std::runtime_error("Could not request edge detection for line " + std::to_string(line_id));
 }
 
-// void Gpio::get_event_info(int line_id);
-
-bool Gpio::wait_for_event(int line_id, std::chrono::nanoseconds timeout)
+void Gpio::set_timeout(std::chrono::nanoseconds timeout)
 {
-    gpiod_line *line = retrieve_gpiod_line(line_id);
-
-    if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_INPUT)
-        throw std::runtime_error("requested line is not configured as input");
-
     std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(timeout);
     std::chrono::nanoseconds nano = timeout - std::chrono::duration_cast<std::chrono::nanoseconds>(secs);
 
@@ -121,9 +116,18 @@ bool Gpio::wait_for_event(int line_id, std::chrono::nanoseconds timeout)
         throw std::range_error("Duration is out of range for conversion to timespec");
     }
 
-    timespec timeout_spec = {
+    timeout_spec = {
         .tv_sec = static_cast<time_t>(secs.count()),
         .tv_nsec = static_cast<long>(nano.count())};
+}
+
+
+bool Gpio::wait_for_event(int line_id)
+{
+    gpiod_line *line = retrieve_gpiod_line(line_id);
+
+    if (gpiod_line_direction(line) != GPIOD_LINE_DIRECTION_INPUT)
+        throw std::runtime_error("requested line is not configured as input");
 
     gpiod_line_event event;
 

@@ -57,7 +57,7 @@ int count_set_bits(int n)
 Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), _channels_active(0x0)
 {
     _spi.set_mode(MODE_3);
-    _spi.set_speed(8e6);
+    _spi.set_speed(16e6);
     _spi.set_bits_per_word(8);
 
     _gpio.set_direction(Pins::CLKSEL, Direction::OUTPUT);
@@ -68,6 +68,7 @@ Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(s
     _gpio.set_output(Pins::CLKSEL, Values::LOW);
 
     _gpio.set_detection(Pins::DRDY, Detection::FALLING);
+    _gpio.set_timeout(10ms);
 
     reset_local_registers();
 }
@@ -402,27 +403,53 @@ IdReg Ads1258::get_id(void)
     return {.raw_data = get_register(RegisterAdressses::ID)};
 }
 
-ChannelData Ads1258::get_data(void)
+ChannelData Ads1258::get_data_read(void)
 {
     constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_COMMAND}};
 
-    Config0 cf0 = {.raw_data = get_register(RegisterAdressses::CONFIG0)};
+    std::vector<char> rx = _spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0});
 
-    if (cf0.bits.stat)
-    {
-        std::vector<char> rx = _spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0});
+    StatusByte stats = {.data = rx[1]};
 
-        StatusByte stats = {.data = rx[1]};
+    int32_t value = static_cast<int32_t>((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24));
 
-        int32_t value = (int32_t)((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24));
+    value >>= 8;
 
+    return {static_cast<char>(stats.bits.CHID), value};
+}
+
+ChannelData Ads1258::get_data_direct(void)
+{
+    const Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
+
+    constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_COMMAND}};
+
+    std::vector<char> rx = _spi.receive(cf0.bits.stat ? 4 : 3);
+
+    if(cf0.bits.stat) {
+        StatusByte stats = {.data = rx[0]};
+
+        int32_t value = static_cast<int32_t>((uint32_t)rx[3] << 8 | ((uint32_t)rx[2] << 16) | ((uint32_t)(rx[1]) << 24));
+        
         value >>= 8;
 
         return {static_cast<char>(stats.bits.CHID), value};
     }
+    else
+    {        
+
+        int32_t value = static_cast<int32_t>((uint32_t)rx[2] << 8 | ((uint32_t)rx[1] << 16) | ((uint32_t)(rx[0]) << 24));
+        
+        value >>= 8;
+
+        return {0, value};
+
+    }
+
+
 }
 
-bool Ads1258::await_data_ready(std::chrono::microseconds max_timeout)
+bool Ads1258::await_data_ready(void)
 {
-    return _gpio.wait_for_event(Pins::DRDY, max_timeout);
+    return _gpio.wait_for_event(Pins::DRDY);
 }
