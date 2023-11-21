@@ -53,7 +53,7 @@ typedef GpioReg GpioDirection;
 typedef GpioReg GpioOutput;
 typedef GpioReg GpioInput;
 
-typedef std::pair<char, int32_t> ChannelData;
+typedef std::pair<uint8_t, int32_t> ChannelData;
 
 union SingleChannel
 {

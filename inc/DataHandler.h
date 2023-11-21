@@ -40,19 +40,19 @@ private:
     std::atomic_bool _run_filter_thread = true;
     std::atomic_bool _run_storing_thread = true;
 
-    std::deque<std::vector<int32_t>> _data_mailbox;
+    std::deque<ChannelData> _raw_data_queue;
 
     std::mutex _mailbox_mtx;
 
     std::condition_variable _cv;
-    bool _data_ready = false;
 
     std::vector<uint8_t> _active_channels;
     uint8_t _current_channel;
     uint8_t _n_active_channels;
 
     double _sample_rate;
-    
+    uint32_t _n_samples_per_file;
+
     std::chrono::system_clock::time_point _current_timestamp;
 
     void irq_thread_func(void);
@@ -68,8 +68,8 @@ public:
     void irq_thread_start(void);
     void irq_thread_stop(void);
 
-    void processing_thread_start(void);
-    void processing_thread_stop(void);
+    void storing_thread_start(void);
+    void storing_thread_stop(void);
 
     DataHandler();
     ~DataHandler();

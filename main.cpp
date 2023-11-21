@@ -13,9 +13,9 @@ INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[])
 {
-    START_EASYLOGGINGPP(argc, argv);
-
     easylogging_config();
+
+    START_EASYLOGGINGPP(argc, argv);
 
     LOG(INFO) << "hello world!";
 
@@ -24,7 +24,8 @@ int main(int argc, char *argv[])
     handler.setup_adc(10);
 
     handler.irq_thread_start();
-    handler.processing_thread_start();
+    std::this_thread::sleep_for(10ms);
+    handler.storing_thread_start();
 
     while (true)
     {
