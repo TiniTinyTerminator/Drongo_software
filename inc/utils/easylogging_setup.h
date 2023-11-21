@@ -8,7 +8,7 @@ inline void easylogging_config(void)
 
     logging_conf.set(el::Level::Global, el::ConfigurationType::Format, "%datetime{%A %d/%M/%Y %H:%m:%s} (%level): %msg");
 
-    logging_conf.set(el::Level::Global, el::ConfigurationType::Filename, "~/Drongo_software.log");
+    logging_conf.set(el::Level::Global, el::ConfigurationType::Filename, "Drongo_software.log");
 
     el::Loggers::reconfigureAllLoggers(logging_conf);
 
