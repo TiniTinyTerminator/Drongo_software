@@ -1,6 +1,10 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.25)
 
 project(Drongo_software)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
@@ -43,22 +47,30 @@ if(NOT inih_POPULATED)
     )
 endif()
 
+FetchContent_Declare(
+    iir1
+    GIT_REPOSITORY https://github.com/berndporr/iir1.git
+    GIT_TAG 1.9.4
+)
+
+FetchContent_GetProperties(iir1)
+
+if(NOT iir1_POPULATED)
+    FetchContent_Populate(iir1)
+
+    add_subdirectory(${iir1_SOURCE_DIR})
+    include_directories(${iir1_SOURCE_DIR})
+
+    endif()
+
+
 
 find_package(Threads REQUIRED)
 
 find_library(GPIOD_LIBRARY NAMES gpiod REQUIRED)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-message(STATUS "${CMAKE_C_COMPILER}")
-
-# if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64") 
-    # Set compiler optimization flags for ARM
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mtune=cortex-a72")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mtune=cortex-a72")
-# endif()
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mtune=cortex-a72")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mtune=cortex-a72")
 
 set(SRC "src")
 set(INC "inc")
@@ -69,24 +81,27 @@ add_executable(Drongo_software
     "main.cpp"
 )
 
-add_library(gpio_class STATIC
+add_library(rpio_classes STATIC
     "${SRC}/gpio.cpp"
-)
-
-target_link_libraries(gpio_class PRIVATE ${GPIOD_LIBRARY})
-
-add_library(spi_class STATIC
     "${SRC}/spi.cpp"
 )
 
+target_link_libraries(rpio_classes PRIVATE ${GPIOD_LIBRARY})
+
 add_library(Ads1258_class STATIC
     "${SRC}/Ads1258.cpp"
+)
+
+add_library(DataHandler_class STATIC
+    "${SRC}/DataHandler.cpp"
 )
 
 add_library(WAVwriter_class STATIC
     "${SRC}/WAVwriter.cpp"
 )
 
-target_link_libraries(Ads1258_class PRIVATE gpio_class spi_class)
+target_link_libraries(Ads1258_class PRIVATE rpio_classes)
 
-target_link_libraries(Drongo_software PRIVATE  Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class)
+target_link_libraries(DataHandler_class PRIVATE Ads1258_class WAVwriter_class)
+
+target_link_libraries(Drongo_software PRIVATE  Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class DataHandler_class iir_static)

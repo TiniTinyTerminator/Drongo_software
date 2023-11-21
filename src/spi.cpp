@@ -1,10 +1,10 @@
-#include "spi.h"
-
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+
+#include "spi.h"
 
 Spi::Spi(std::filesystem::path dev) : device_file(dev)
 {

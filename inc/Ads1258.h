@@ -114,7 +114,7 @@ union SystemChannels
 
 constexpr double channel_drate_delay_to_frequency(const double n_channels, const double drate, const double delay_us)
 {    
-    double time = 1 / drate + delay_us * 1E-6;
+    double time = 1 / drate + delay_us * 1e-6;
 
     return 1 / (time * n_channels);
 }
@@ -128,6 +128,9 @@ private:
     uint8_t _n_channels_active;
     uint8_t _current_channel;
     
+    uint8_t _channel_index;
+    std::vector<uint8_t> _channel_ids;
+
     std::map<RegisterAdressses, char> registers;
 
     void set_register(RegisterAdressses address, char data);
@@ -171,9 +174,12 @@ public:
     GpioInput get_gpio_intput(void);
     IdReg get_id(void);
 
-    bool await_data_ready(void);
+    // bool await_data_ready(void);
+
     ChannelData get_data_read(void);
     ChannelData get_data_direct(void);
+    std::vector<uint8_t> get_active_channels(void);
+    uint8_t get_current_channel(void);
 };
 
 #endif

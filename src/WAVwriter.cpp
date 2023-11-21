@@ -1,5 +1,33 @@
 #include "WAVwriter.h"
 
+// Main chunk descriptor
+const std::string _main_chunk_id = "RIFF";
+const std::string _format = "WAVE";
+
+// Subchunk1 (fmt subchunk)
+const std::string _subchunk1_id = "fmt ";
+
+constexpr int32_t _subchunk1_size = 16; // For PCM data
+
+// constant (may be added to configuration in later versions)
+constexpr int16_t _audio_format = 1;    // PCM
+
+// Subchunk2 (data subchunk)
+const std::string subchunk2_id = "data";
+
+template <class T>
+void write_as_bytes(std::ostream &_output_file, const T &obj)
+{
+    const char *ptr = reinterpret_cast<const char *>(&obj);
+
+    // Write obj to stream
+    _output_file.write(ptr, sizeof(obj));
+}
+
+WAVWriter::WAVWriter()
+{
+}
+
 WAVWriter::WAVWriter(uint8_t num_channels, uint32_t sample_rate, uint8_t bits_per_sample)
     : _n_channels(num_channels),
       _sample_rate(sample_rate),
@@ -28,16 +56,12 @@ void WAVWriter::set_datetime(const std::chrono::system_clock::time_point &dateti
 void WAVWriter::open_file(const std::string &file_name)
 {
     if (_output_file.is_open())
-    {
         close_file();
-    }
 
     _output_file.open(file_name, std::ios::binary);
 
     if (!_output_file.is_open())
-    {
         throw std::runtime_error("Could not open file for writing: " + file_name);
-    }
 
     write_wav_header();
 }
@@ -53,12 +77,46 @@ void WAVWriter::close_file()
     }
 }
 
+void WAVWriter::set_n_channels(uint16_t num_channels)
+{
+    if(_output_file.is_open())
+        throw std::runtime_error("cannot update number of channels while file is open");
+
+    _n_channels = num_channels;
+
+    _block_align = (_n_channels * _bits_per_sample) >> 3;
+    _byte_rate = _sample_rate * _block_align;
+}
+
+void WAVWriter::set_sample_rate(uint32_t sample_rate)
+{
+    if(_output_file.is_open())
+        throw std::runtime_error("cannot update sample rate while file is open");
+
+    _sample_rate = sample_rate;
+
+    _block_align = (_n_channels * _bits_per_sample) >> 3;
+    _byte_rate = _sample_rate * _block_align;
+}
+
+void WAVWriter::set_bits_per_sample(uint16_t bits_per_sample)
+{
+    if(_output_file.is_open())
+        throw std::runtime_error("cannot update bits per sample while file is open");
+
+    _bits_per_sample = bits_per_sample; 
+    _bytes_to_write = bits_per_sample >> 3;
+
+    _block_align = (_n_channels * _bits_per_sample) >> 3;
+    _byte_rate = _sample_rate * _block_align;
+}
+
+
+
 void WAVWriter::write_channels(const std::vector<int32_t> &samples)
 {
     if (!_output_file.is_open())
-    {
         throw std::runtime_error("File is not open for writing samples.");
-    }
 
     if (samples.size() != _n_channels)
         throw std::runtime_error("Incorrect number of channels");
@@ -66,12 +124,9 @@ void WAVWriter::write_channels(const std::vector<int32_t> &samples)
     _output_file.seekp(_current_data_chunk_pos);
 
     for (const auto &sample : samples)
-    {
         _output_file.write(reinterpret_cast<const char *>(&sample), _bytes_to_write);
-    }
 
     _current_data_chunk_pos = _output_file.tellp();
-
 }
 
 void WAVWriter::write_samples(const std::vector<int32_t> &samples)
@@ -82,9 +137,7 @@ void WAVWriter::write_samples(const std::vector<int32_t> &samples)
     _output_file.seekp(_current_data_chunk_pos);
 
     for (const auto &sample : samples)
-    {
         _output_file.write(reinterpret_cast<const char *>(&sample), _bytes_to_write);
-    }
 
     _current_data_chunk_pos = _output_file.tellp();
 }
@@ -154,9 +207,7 @@ void WAVWriter::write_info_chunk()
 void WAVWriter::finalize_wav_header()
 {
     if (!_output_file.is_open())
-    {
         throw std::runtime_error("File is not open for finalizing WAV header.");
-    }
 
     _output_file.seekp(0, std::ios::end);
 

@@ -13,6 +13,8 @@
 #include <bitset>
 #include <thread>
 
+#include "easylogging++.h"
+
 #include "spi.h"
 #include "RaspberryPiGPIO.h"
 
@@ -30,19 +32,6 @@ enum Pins
     PWDN = PhysicalToBCM::PIN16
 };
 
-union BytesToInteger
-{
-    struct
-    {
-        char byte1 : 8;
-        char byte2 : 8;
-        char byte3 : 8;
-        char byte4 : 8;
-    } bytes;
-
-    int integer;
-};
-
 int count_set_bits(int n)
 {
     int count = 0;
@@ -57,7 +46,7 @@ int count_set_bits(int n)
 Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), _channels_active(0x0)
 {
     _spi.set_mode(MODE_3);
-    _spi.set_speed(16e6);
+    _spi.set_speed(8e6);
     _spi.set_bits_per_word(8);
 
     _gpio.set_direction(Pins::CLKSEL, Direction::OUTPUT);
@@ -66,9 +55,12 @@ Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(s
     _gpio.set_direction(Pins::PWDN, Direction::OUTPUT);
 
     _gpio.set_output(Pins::CLKSEL, Values::LOW);
+    _gpio.set_output(Pins::START, Values::LOW);
+    _gpio.set_output(Pins::RST, Values::LOW);
+    _gpio.set_output(Pins::PWDN, Values::LOW);
 
-    _gpio.set_detection(Pins::DRDY, Detection::FALLING);
-    _gpio.set_timeout(10ms);
+    // _gpio.set_detection(Pins::DRDY, Detection::FALLING);
+    _gpio.set_timeout(5us);
 
     reset_local_registers();
 }
@@ -95,6 +87,10 @@ void Ads1258::reset_channel_data(void)
 
 Ads1258::~Ads1258()
 {
+    _gpio.set_output(Pins::CLKSEL, Values::LOW);
+    _gpio.set_output(Pins::START, Values::LOW);
+    _gpio.set_output(Pins::RST, Values::LOW);
+    _gpio.set_output(Pins::PWDN, Values::LOW);
 }
 
 void Ads1258::start(bool start)
@@ -104,7 +100,8 @@ void Ads1258::start(bool start)
     if (_gpio.get_input(Pins::START) == LOW)
     {
         reset_channel_data();
-    }}
+    }
+}
 
 void Ads1258::pwdn(bool pwdn)
 {
@@ -116,6 +113,7 @@ void Ads1258::pwdn(bool pwdn)
     {
         reset_local_registers();
         reset_channel_data();
+        _channel_ids = {};
     }
 }
 
@@ -127,6 +125,7 @@ void Ads1258::reset(bool reset)
     {
         reset_local_registers();
         reset_channel_data();
+        _channel_ids = {};
     }
 }
 
@@ -134,7 +133,7 @@ void Ads1258::set_register(RegisterAdressses address, char data)
 {
     const CommandByte command = {.bits = {address, false, Commands::WRITE_REGISTERS}};
 
-    std::vector<char> message = {command.data, data};
+    std::vector<char> message = {command.raw_data, data};
 
     _spi.transmit(message);
 
@@ -146,7 +145,7 @@ void Ads1258::set_all_registers(void)
     constexpr CommandByte command = {.bits = {0x0, true, Commands::WRITE_REGISTERS}};
 
     std::vector<char> message(NUM_REGISTERS - 1 - 1);
-    message[0] = command.data;
+    message[0] = command.raw_data;
 
     for (auto reg_data : registers)
     {
@@ -162,7 +161,7 @@ char Ads1258::get_register(RegisterAdressses address)
 
     std::vector<char> message(2);
 
-    message[0] = command.data;
+    message[0] = command.raw_data;
 
     return _spi.transceive(message)[1];
 }
@@ -173,7 +172,7 @@ std::vector<char> Ads1258::get_all_registers(void)
 
     std::vector<char> message(NUM_REGISTERS + 1);
 
-    message[0] = command.data;
+    message[0] = command.raw_data;
 
     return _spi.transceive(message);
 }
@@ -336,6 +335,8 @@ void Ads1258::set_auto_single_channel(SingleChannel channels)
 
     set_register(RegisterAdressses::MUXSG0, channels.raw_data);
     set_register(RegisterAdressses::MUXSG1, channels.raw_data >> 8);
+
+    _channel_ids = get_active_channels();
 }
 
 void Ads1258::set_auto_diff_channel(DiffChannel channels)
@@ -347,6 +348,8 @@ void Ads1258::set_auto_diff_channel(DiffChannel channels)
     _n_channels_active = count_set_bits(_channels_active);
 
     set_register(RegisterAdressses::MUXDIF, channels.raw_data);
+
+    _channel_ids = get_active_channels();
 }
 
 void Ads1258::set_system_readings(SystemChannels channels)
@@ -359,6 +362,8 @@ void Ads1258::set_system_readings(SystemChannels channels)
     _n_channels_active = count_set_bits(_channels_active);
 
     set_register(RegisterAdressses::SYSRED, channels.raw_data);
+
+    _channel_ids = get_active_channels();
 }
 
 void Ads1258::set_gpio_direction(GpioDirection channels)
@@ -384,9 +389,9 @@ bool Ads1258::verify_settings(void)
 {
     std::vector<char> adc_data = get_all_registers();
 
-    for (auto r : registers)
+    for (auto reg : registers)
     {
-        if (adc_data[r.first + 1] != r.second)
+        if (adc_data[reg.first + 1] != reg.second)
             return false;
     }
 
@@ -405,51 +410,89 @@ IdReg Ads1258::get_id(void)
 
 ChannelData Ads1258::get_data_read(void)
 {
+    int cnt_err = 0;
+
     constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_COMMAND}};
 
-    std::vector<char> rx = _spi.transceive({command.data, 0x0, 0x0, 0x0, 0x0});
+    ChannelData data_1, data_2;
 
-    StatusByte stats = {.data = rx[1]};
+    do
+    {
+        std::vector<char> rx = _spi.transceive({command.raw_data, 0x0, 0x0, 0x0, 0x0, command.raw_data, 0x0, 0x0, 0x0, 0x0});
 
-    int32_t value = static_cast<int32_t>((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24));
+        StatusByte stats = {.raw_data = rx[1]};
 
-    value >>= 8;
+        data_1 = {static_cast<char>(stats.bits.CHID), static_cast<int32_t>((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24)) >> 8};
 
-    return {static_cast<char>(stats.bits.CHID), value};
+        stats = {.raw_data = rx[6]};
+
+        data_2 = {static_cast<char>(stats.bits.CHID), static_cast<int32_t>((uint32_t)rx[9] << 8 | ((uint32_t)rx[8] << 16) | ((uint32_t)(rx[7]) << 24)) >> 8};
+
+        if (cnt_err >= 5)
+            throw std::runtime_error("could not retrieve channel data within " + std::to_string(cnt_err) + " tries");
+
+
+        // LOG_EVERY_N(2000, INFO) << "missed " << cnt_err << " packages";
+
+        cnt_err++;
+
+    } while (data_1 != data_2);
+
+    _current_channel = data_1.first;
+
+    return data_1;
 }
 
 ChannelData Ads1258::get_data_direct(void)
 {
     const Config0 cf0 = {.raw_data = registers[RegisterAdressses::CONFIG0]};
 
-    constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_COMMAND}};
+    constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_DIRECT}};
 
     std::vector<char> rx = _spi.receive(cf0.bits.stat ? 4 : 3);
 
-    if(cf0.bits.stat) {
-        StatusByte stats = {.data = rx[0]};
+    if (cf0.bits.stat)
+    {
+        StatusByte stats = {.raw_data = rx[0]};
 
         int32_t value = static_cast<int32_t>((uint32_t)rx[3] << 8 | ((uint32_t)rx[2] << 16) | ((uint32_t)(rx[1]) << 24));
-        
+
         value >>= 8;
 
         return {static_cast<char>(stats.bits.CHID), value};
     }
     else
-    {        
+    {
 
         int32_t value = static_cast<int32_t>((uint32_t)rx[2] << 8 | ((uint32_t)rx[1] << 16) | ((uint32_t)(rx[0]) << 24));
-        
+
         value >>= 8;
 
         return {0, value};
-
     }
-
-
 }
 
-bool Ads1258::await_data_ready(void)
+// bool Ads1258::await_data_ready(void)
+// {
+//     return _gpio.wait_for_event(Pins::DRDY);
+// }
+
+std::vector<uint8_t> Ads1258::get_active_channels(void)
 {
-    return _gpio.wait_for_event(Pins::DRDY);
+    uint8_t index = 0;
+
+    std::vector<uint8_t> channels;
+
+    for (uint8_t i = 0; i < 32; i++)
+    {
+        if (_channels_active & (1 << i))
+            channels.push_back(i);
+    }
+
+    return channels;
+}
+
+uint8_t Ads1258::get_current_channel(void)
+{
+    return _current_channel;
 }

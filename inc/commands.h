@@ -66,7 +66,7 @@ union CommandByte
         char command : 3;
     } bits;
 
-    char data;
+    char raw_data;
 };
 
 /* SPI Commands */
@@ -104,7 +104,7 @@ union StatusByte
         bool NEW : 1;    // Bit 7
     } bits;
 
-    char data; // The full byte for direct access
+    char raw_data; // The full byte for direct access
 };
 
 enum ChannelIdentifiers
@@ -222,10 +222,10 @@ enum ScbcsConfig
 /* DRATE field values (fixed-channel DRs shown) */
 enum DrateConfig
 {
-    DRATE_1953SPS = 0x00,
-    DRATE_7813SPS,
-    DRATE_31250SPS,
-    DRATE_125000SPS
+    DRATE_0 = 0x00,
+    DRATE_1,
+    DRATE_2,
+    DRATE_3
 };
 
 /* Register 0x02 (MUXSCH) definition

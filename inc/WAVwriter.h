@@ -1,3 +1,7 @@
+
+#ifndef WAVWRITER_H
+#define WAVWRITER_H
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -6,19 +10,11 @@
 #include <ctime>
 #include <iomanip>
 
-template <class T>
-void write_as_bytes(std::ostream &_output_file, const T &obj)
-{
-    const char *ptr = reinterpret_cast<const char *>(&obj);
-
-    // Write obj to stream
-    _output_file.write(ptr, sizeof(obj));
-}
-
 class WAVWriter
 {
 public:
     WAVWriter(uint8_t num_channels, uint32_t sample_rate, uint8_t bits_per_sample);
+    WAVWriter();
     ~WAVWriter();
 
     void set_comments(const std::string &comment);
@@ -29,27 +25,20 @@ public:
     void write_channels(const std::vector<int32_t> &samples);
     void write_samples(const std::vector<int32_t> &samples);
 
-private:
-    // Main chunk descriptor
-    const std::string _main_chunk_id = "RIFF";
-    const std::string _format = "WAVE";
+    void set_n_channels(uint16_t num_channels);
+    void set_sample_rate(uint32_t sample_rate);
+    void set_bits_per_sample(uint16_t bits_per_sample);
 
-    // Subchunk1 (fmt subchunk)
-    const std::string _subchunk1_id = "fmt ";
-    const int32_t _subchunk1_size = 16; // For PCM
-    const int16_t _audio_format = 1;    // PCM
+private:
 
     // Sample size and speed information
-    const uint16_t _n_channels;
-    const uint32_t _sample_rate;
-    const uint16_t _bits_per_sample;
-    const uint16_t _bytes_to_write;
+    uint16_t _n_channels = 0;
+    uint32_t _sample_rate = 0;
+    uint16_t _bits_per_sample = 0;
+    uint16_t _bytes_to_write = 0;
 
-    const int16_t _block_align;
-    const int32_t _byte_rate;
-
-    // Subchunk2 (data subchunk)
-    const std::string subchunk2_id = "data";
+    int16_t _block_align = 0;
+    int32_t _byte_rate = 0;
 
     // Stream objects;
     std::ofstream _output_file;
@@ -65,3 +54,5 @@ private:
 
     void finalize_wav_header();
 };
+
+#endif
