@@ -60,14 +60,13 @@ if(NOT iir1_POPULATED)
 
     add_subdirectory(${iir1_SOURCE_DIR})
     include_directories(${iir1_SOURCE_DIR})
-
-    endif()
-
-
+endif()
 
 find_package(Threads REQUIRED)
 
-find_library(GPIOD_LIBRARY NAMES gpiod REQUIRED)
+find_library(FFTW3_LIBRARY NAMES libfftw3.a REQUIRED)
+
+find_library(GPIOD_LIBRARY NAMES libgpiod.a REQUIRED)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mtune=cortex-a72 -ftree-vectorize")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mtune=cortex-a72 -ftree-vectorize")
@@ -86,7 +85,6 @@ add_library(rpio_classes STATIC
     "${SRC}/spi.cpp"
 )
 
-target_link_libraries(rpio_classes PRIVATE ${GPIOD_LIBRARY})
 
 add_library(Ads1258_class STATIC
     "${SRC}/Ads1258.cpp"
@@ -100,8 +98,16 @@ add_library(WAVwriter_class STATIC
     "${SRC}/WAVwriter.cpp"
 )
 
+add_library(FftWindow_class STATIC
+    "${SRC}/FftWindow.cpp"
+)
+
+target_link_libraries(rpio_classes PRIVATE GPIOD_LIBRARY)
+
 target_link_libraries(Ads1258_class PRIVATE rpio_classes)
 
 target_link_libraries(DataHandler_class PRIVATE Ads1258_class WAVwriter_class)
 
-target_link_libraries(Drongo_software PRIVATE  Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class DataHandler_class iir_static)
+target_link_libraries(DataHandler_class PRIVATE FftWindow_class FFTW3_LIBRARY)
+
+target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class DataHandler_class iir_static)

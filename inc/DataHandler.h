@@ -60,6 +60,7 @@ private:
     void irq_thread_func(void);
     // void filter_thread(void);
     void storing_thread_func(void);
+    void fft_thread_func(void);
 
 public:
     void get_configuration(std::filesystem::path path);
