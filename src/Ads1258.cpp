@@ -46,7 +46,7 @@ int count_set_bits(int n)
 Ads1258::Ads1258(std::filesystem::path spi, std::filesystem::path gpio) : _spi(spi), _gpio(gpio), _channels_active(0x0)
 {
     _spi.set_mode(MODE_3);
-    _spi.set_speed(8e6);
+    _spi.set_speed(12e6);
     _spi.set_bits_per_word(8);
 
     _gpio.set_direction(Pins::CLKSEL, Direction::OUTPUT);
@@ -408,39 +408,26 @@ IdReg Ads1258::get_id(void)
     return {.raw_data = get_register(RegisterAdressses::ID)};
 }
 
-ChannelData Ads1258::get_data_read(void)
+std::pair<ChannelData, ChannelData> Ads1258::get_data_read(void)
 {
-    int cnt_err = 0;
 
     constexpr CommandByte command = {.bits = {0x0, true, Commands::READ_COMMAND}};
 
     ChannelData data_1, data_2;
 
-    do
-    {
-        std::vector<char> rx = _spi.transceive({command.raw_data, 0x0, 0x0, 0x0, 0x0, command.raw_data, 0x0, 0x0, 0x0, 0x0});
+    std::vector<char> rx = _spi.transceive({command.raw_data, 0x0, 0x0, 0x0, 0x0, command.raw_data, 0x0, 0x0, 0x0, 0x0});
 
-        StatusByte stats = {.raw_data = rx[1]};
+    StatusByte stats = {.raw_data = rx[1]};
 
-        data_1 = {static_cast<char>(stats.bits.CHID), static_cast<int32_t>((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24)) >> 8};
+    data_1 = {static_cast<char>(stats.bits.CHID), static_cast<int32_t>((uint32_t)rx[4] << 8 | ((uint32_t)rx[3] << 16) | ((uint32_t)(rx[2]) << 24)) >> 8};
 
-        stats = {.raw_data = rx[6]};
+    stats = {.raw_data = rx[6]};
 
-        data_2 = {static_cast<char>(stats.bits.CHID), static_cast<int32_t>((uint32_t)rx[9] << 8 | ((uint32_t)rx[8] << 16) | ((uint32_t)(rx[7]) << 24)) >> 8};
-
-        if (cnt_err >= 5)
-            throw std::runtime_error("could not retrieve channel data within " + std::to_string(cnt_err) + " tries");
-
-
-        // LOG_EVERY_N(2000, INFO) << "missed " << cnt_err << " packages";
-
-        cnt_err++;
-
-    } while (data_1 != data_2);
+    data_2 = {static_cast<char>(stats.bits.CHID), static_cast<int32_t>((uint32_t)rx[9] << 8 | ((uint32_t)rx[8] << 16) | ((uint32_t)(rx[7]) << 24)) >> 8};
 
     _current_channel = data_1.first;
 
-    return data_1;
+    return {data_1, data_2};
 }
 
 ChannelData Ads1258::get_data_direct(void)

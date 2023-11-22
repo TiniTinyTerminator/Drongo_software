@@ -23,7 +23,7 @@
 
 #include "Ads1258.h"
 #include "WAVwriter.h"
-#include "Iir.h"
+
 
 class DataHandler
 {
@@ -50,6 +50,8 @@ private:
     uint8_t _current_channel;
     uint8_t _n_active_channels;
 
+    std::string _current_filename;
+
     double _sample_rate;
     uint32_t _n_samples_per_file;
 
@@ -64,6 +66,7 @@ public:
     void setup_adc(uint32_t tries);
 
     void new_file(void);
+    void delete_last_file(void);
 
     void irq_thread_start(void);
     void irq_thread_stop(void);

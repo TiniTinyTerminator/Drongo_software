@@ -17,8 +17,9 @@
 #include "easylogging++.h"
 #include "utils/linux_scheduling.h"
 
-#include "Ads1258.h"
+#include "Iir.h"
 
+#include "Ads1258.h"
 #include "DataHandler.h"
 
 using namespace std::chrono_literals;
@@ -55,25 +56,29 @@ void DataHandler::setup_adc(const uint32_t max_tries = 10)
         _adc.enable_bypass(false);
         _adc.enable_status(true);
         _adc.enable_external_clock(false);
-        _adc.set_drate(DrateConfig::DRATE_1);
+        _adc.set_drate(DrateConfig::DRATE_3);
         _adc.set_delay(DelayConfig::DLY_0us);
         _adc.enable_auto(true);
-        _adc.set_auto_single_channel({.raw_data = 0b1110000000000000});
+        _adc.set_auto_single_channel({.raw_data = 0b1111111111110000});
 
         if (_adc.verify_settings())
             break;
+        else
+            tries++;
 
-        LOG_IF(tries > 0, WARNING) << "tried setting up adc " << tries << " times";
-    } while (tries++ < max_tries);
+
+        LOG(WARNING) << "tried setting up adc " << tries << " times";
+
+    } while (tries < max_tries);
 
     if (tries >= max_tries)
         throw std::runtime_error("could not setup adc");
 
     _active_channels = _adc.get_active_channels();
     _n_active_channels = _active_channels.size();
-    
-    _sample_rate = channel_drate_delay_to_frequency(_n_active_channels, AUTO_DRATE1, DLY0);
-    
+
+    _sample_rate = channel_drate_delay_to_frequency(_n_active_channels, AUTO_DRATE3, DLY0);
+
     _n_samples_per_file = _sample_rate * 30;
 
     _writer.set_n_channels(_n_active_channels);
@@ -90,8 +95,16 @@ void DataHandler::new_file(void)
     ss << std::put_time(std::localtime(&in_time_t), "date-%Y-%m-%d-time-%H-%M-%S.wav");
 
     _writer.open_file(ss.str());
+    _current_filename = ss.str();
 
     _writer.set_datetime(_current_timestamp);
+}
+
+void DataHandler::delete_last_file(void)
+{
+    _writer.close_file();
+
+    std::remove(_current_filename.c_str());
 }
 
 void DataHandler::irq_thread_start(void)
@@ -129,12 +142,6 @@ void DataHandler::irq_thread_func(void)
     set_realtime_priority();
     set_thread_affinity(0);
 
-    std::chrono::time_point t_prev = std::chrono::system_clock::now(), t_curr = t_prev;
-
-    int64_t t_sample_period = 1e9 / _sample_rate;
-
-    const std::chrono::nanoseconds t_request_data_period(static_cast<long long>((long long)1e9 / AUTO_DRATE1 / 5));
-
     LOG(INFO) << "starting sampling";
 
     _adc.start(true);
@@ -148,54 +155,47 @@ void DataHandler::irq_thread_func(void)
     while (_run_irq_thread)
     {
 
-        // LOG_EVERY_N(1000, INFO) << "still sampling";
+        std::pair<ChannelData, ChannelData> current;
 
-        std::this_thread::sleep_for(20us);
-
-        ChannelData current = _adc.get_data_read();
-
-        if (previous == current)
-            continue;
-
-        if (std::find(_active_channels.begin(), _active_channels.end(), current.first) == _active_channels.end())
+        try
         {
-            i++;
-            LOG(WARNING) << "misread of adc data " << i << " times";
+            current = _adc.get_data_read();
+            std::this_thread::sleep_for(1us);
+        }
+        catch (const std::exception &e)
+        {
+            LOG(ERROR) << e.what();
 
-            if (i > 100)
-            {
-                LOG(WARNING) << "too many failures, restarting ADC";
-
-                storing_thread_stop();
-
-                setup_adc();
-
-                std::this_thread::sleep_for(10ms);
-
-                storing_thread_start();
-
-                i = 0;
-            }
-
-            continue;
+            current = {};
         }
 
-        previous = current;
+        auto [a, b] = current;
+
+        if(a.first == b.first && a.second != b.second) continue;
+
+        if (previous == a) continue;
+
+        previous = a;
 
         std::unique_lock lock(_mailbox_mtx);
 
-        _raw_data_queue.push_back(current);
+        _raw_data_queue.push_back(current.first);
 
-        if (_raw_data_queue.size() >= 100)
+        if (_raw_data_queue.size() >= 1000)
         {
             _cv.notify_one();
         }
+
+
     }
 }
 
 void DataHandler::storing_thread_func(void)
 {
     LOG(INFO) << "processing thread starting";
+
+    set_realtime_priority();
+    set_thread_affinity(1);
 
     _current_timestamp = std::chrono::system_clock::now();
 
@@ -205,13 +205,11 @@ void DataHandler::storing_thread_func(void)
 
     for (auto &filter : filters)
     {
-        filter.setup(_sample_rate, 550, 40);
+        filter.setup(_sample_rate, 550, 100);
         filter.reset();
     }
 
     new_file();
-
-    _writer.set_comments("GEO5X,GEO5Y,GEO5Z,GEO4X,GEO4Y,GEO4Z,GEO3X,GEO3Y,GEO3Z,GEO2X,GEO2Y,GEO2Z");
 
     std::deque<std::vector<int32_t>> sorted_sample_queue;
 
@@ -220,7 +218,7 @@ void DataHandler::storing_thread_func(void)
 
         int32_t i = 0, c = 0;
 
-        while (_raw_data_queue.size() >= _n_active_channels && _run_storing_thread && sorted_sample_queue.size() < 200)
+        while (_run_storing_thread && sorted_sample_queue.size() < 1000)
         {
             std::vector<int32_t> samples(_n_active_channels);
 
@@ -229,8 +227,10 @@ void DataHandler::storing_thread_func(void)
 
                 std::unique_lock lock(_mailbox_mtx);
 
-                _cv.wait(lock, [&]()
-                         { return _raw_data_queue.size() >= 100 || !_run_storing_thread; });
+
+                if(_raw_data_queue.size() <= _n_active_channels)
+                    _cv.wait(lock, [&]()
+                            { return _raw_data_queue.size() >= 1000 || !_run_storing_thread; });
 
                 if (!_run_storing_thread)
                     break;
@@ -257,7 +257,6 @@ void DataHandler::storing_thread_func(void)
             sorted_sample_queue.push_back(samples);
         }
 
-        std::deque<std::vector<int32_t>> previous_samples;
 
         while (sorted_sample_queue.size() > 10)
         {
@@ -278,75 +277,9 @@ void DataHandler::storing_thread_func(void)
                 sample[i] = filters[i].filter(sample[i]);
             }
 
-            // for (uint32_t i = 0; i < _n_active_channels; i++)
-            // {
-            //     if (sample[i] == 0)
-            //     {
-            //         auto prev_iter = previous_samples.rbegin();        // Reverse iterator for previous_samples
-            //         auto next_iter = sorted_sample_queue.begin() + 1; // Iterator for sorted_sample_queue
-
-            //         float prev_value = 0;
-            //         float next_value = 0;
-            //         bool prev_found = false, next_found = false;
-
-            //         // Search for the previous non-zero value using reverse iterator
-            //         for (; prev_iter != previous_samples.rend(); ++prev_iter)
-            //         {
-            //             if (prev_iter->at(i) != 0)
-            //             {
-            //                 prev_value = prev_iter->at(i);
-            //                 prev_found = true;
-            //                 break;
-            //             }
-            //         }
-
-            //         // Search for the next non-zero value
-            //         for (; next_iter != sorted_sample_queue.end(); ++next_iter)
-            //         {
-            //             if (next_iter->at(i) != 0)
-            //             {
-            //                 next_value = next_iter->at(i);
-            //                 next_found = true;
-            //                 break;
-            //             }
-            //         }
-
-            //         if (prev_found && next_found)
-            //         {
-            //             // Calculate the distance between the found points and adjust the ratio accordingly
-            //             // Assuming each step in the iterators corresponds to the same time increment
-            //             int backwardDistance = std::distance(previous_samples.rbegin(), prev_iter);
-            //             int forwardDistance = std::distance(sorted_sample_queue.begin(), next_iter) - 1;
-            //             int totalDistance = backwardDistance + forwardDistance;
-            //             float ratio = static_cast<float>(backwardDistance) / totalDistance;
-            //             sample[i] = prev_value + ratio * (next_value - prev_value);
-            //         }
-            //         else
-            //         {
-            //             LOG(WARNING) << "no substitute found for lost sample, copying next";
-
-            //             for (auto next = sorted_sample_queue.begin() + 1; next != sorted_sample_queue.end(); next++)
-            //             {
-            //                 if (next->at(i) != 0)
-            //                 {
-            //                     sample[i] = next->at(i);
-            //                     break;
-            //                 }
-            //             }
-            //         }
-                // }
-
-                // sample[i] = filters[i].filter(sample[i]);
-            // }
-
             _writer.write_channels(sample);
-            
+
             sample_counter++;
-
-            previous_samples.push_front(sorted_sample_queue.front());
-
-            while (previous_samples.size() > 100)
-                previous_samples.pop_back();
 
             sorted_sample_queue.pop_front();
         }
@@ -355,13 +288,23 @@ void DataHandler::storing_thread_func(void)
         {
             _current_timestamp = std::chrono::system_clock::now();
 
+            std::stringstream ss;
+            time_t in_time_t = std::chrono::system_clock::to_time_t(_current_timestamp);
+            ss << "end time: " << std::put_time(std::localtime(&in_time_t), "%Y/%m/%d %H:%M:%S");
+
+            _writer.set_comments(ss.str());
+
             sample_counter = 0;
 
             new_file();
         }
-
     }
 
+    std::stringstream ss;
+    time_t in_time_t = std::chrono::system_clock::to_time_t(_current_timestamp);
+    ss << "end time: " << std::put_time(std::localtime(&in_time_t), "%Y/%m/%d %H:%M:%S");
+
+    _writer.set_comments(ss.str());
     _writer.close_file();
 
     LOG(INFO) << "processing thread stopped";

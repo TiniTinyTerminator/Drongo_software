@@ -69,8 +69,8 @@ find_package(Threads REQUIRED)
 
 find_library(GPIOD_LIBRARY NAMES gpiod REQUIRED)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mtune=cortex-a72")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mtune=cortex-a72")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mtune=cortex-a72 -ftree-vectorize")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mtune=cortex-a72 -ftree-vectorize")
 
 set(SRC "src")
 set(INC "inc")

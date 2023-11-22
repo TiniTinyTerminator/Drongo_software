@@ -176,7 +176,8 @@ public:
 
     // bool await_data_ready(void);
 
-    ChannelData get_data_read(void);
+    std::pair<ChannelData, ChannelData> get_data_read(void);
+
     ChannelData get_data_direct(void);
     std::vector<uint8_t> get_active_channels(void);
     uint8_t get_current_channel(void);
