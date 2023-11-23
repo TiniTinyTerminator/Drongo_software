@@ -1,6 +1,9 @@
 #include <iostream>
 
 #include "ini.h"
+
+#define ELPP_NO_LOG_TO_FILE
+
 #include "easylogging++.h"
 
 #include "utils/easylogging_setup.h"

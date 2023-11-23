@@ -139,12 +139,14 @@ void DataHandler::storing_thread_stop(void)
 
 void DataHandler::irq_thread_func(void)
 {
-    set_realtime_priority();
-    set_thread_affinity(0);
+    set_thread_priority(80, SCHED_OTHER);
+    // set_thread_affinity(0);
 
     LOG(INFO) << "starting sampling";
 
     _adc.start(true);
+
+    auto t_now = std::chrono::system_clock::now(), t_prev = t_now;
 
     std::this_thread::sleep_for(1us);
 
@@ -160,7 +162,7 @@ void DataHandler::irq_thread_func(void)
         try
         {
             current = _adc.get_data_read();
-            std::this_thread::sleep_for(1us);
+            // std::this_thread::sleep_for(10us);
         }
         catch (const std::exception &e)
         {
@@ -176,6 +178,13 @@ void DataHandler::irq_thread_func(void)
         if (previous == a) continue;
 
         previous = a;
+
+        int64_t us_diff = std::chrono::duration_cast<std::chrono::microseconds>(t_now - t_prev).count();
+
+        // LOG_IF(us_diff > 100, INFO) << us_diff << " microseconds";
+
+        t_prev = t_now;
+        t_now = std::chrono::system_clock::now();
 
         std::unique_lock lock(_mailbox_mtx);
 
@@ -194,18 +203,18 @@ void DataHandler::storing_thread_func(void)
 {
     LOG(INFO) << "processing thread starting";
 
-    set_realtime_priority();
-    set_thread_affinity(1);
+    // set_realtime_priority();
+    // set_thread_affinity(1);
 
     _current_timestamp = std::chrono::system_clock::now();
 
     uint32_t sample_counter = 0;
 
-    std::vector<Iir::ChebyshevII::LowPass<20>> filters(_n_active_channels);
+    std::vector<Iir::ChebyshevII::LowPass<16>> filters(_n_active_channels);
 
     for (auto &filter : filters)
     {
-        filter.setup(_sample_rate, 550, 100);
+        filter.setup(_sample_rate, 500, 60);
         filter.reset();
     }
 

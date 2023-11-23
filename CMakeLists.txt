@@ -102,12 +102,12 @@ add_library(FftWindow_class STATIC
     "${SRC}/FftWindow.cpp"
 )
 
-target_link_libraries(rpio_classes PRIVATE GPIOD_LIBRARY)
+target_link_libraries(rpio_classes PRIVATE ${GPIOD_LIBRARY})
 
 target_link_libraries(Ads1258_class PRIVATE rpio_classes)
 
 target_link_libraries(DataHandler_class PRIVATE Ads1258_class WAVwriter_class)
 
-target_link_libraries(DataHandler_class PRIVATE FftWindow_class FFTW3_LIBRARY)
+target_link_libraries(DataHandler_class PRIVATE FftWindow_class ${FFTW3_LIBRARY})
 
-target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class DataHandler_class iir_static)
+target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class DataHandler_class iir_static FftWindow_class) 

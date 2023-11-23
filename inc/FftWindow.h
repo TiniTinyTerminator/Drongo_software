@@ -1,44 +1,47 @@
 /**
  * @file FftWindow.h
  * @author your name (you@domain.com)
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-11-22
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
+#ifndef FFTWINDOW_H
+#define FFTWINDOW_H
+
+#include <deque>
+#include <cinttypes>
+#include <vector>
+
 #include <fftw3.h>
-
-
 
 class FftWindow
 {
 private:
-    size_t _length;
-    size_t _width;
+    const size_t _length;
+    const size_t _half_fft_length;
+
+    std::deque<double> _buffer;
 
     fftw_plan _plan;
 
-    fftw_complex *_input, *_output;
+    double *_input;
+    fftw_complex *_output;
 
+    void update_plan();
 
 public:
-    FftWindow() = default;
+    FftWindow(const size_t len);
     ~FftWindow();
+
+    void add_data_point(double data);
+    void clear_data();
+
+    void calculate_fft();
+    std::vector<double> determine_absolutes();
 };
 
-FftWindow::FftWindow(/* args */)
-{
-}
-
-FftWindow::~FftWindow()
-{
-    fftw_destroy_plan(_plan);
-
-    fftw_free(_input);
-    fftw_free(_output);
-
-    fftw_cleanup();
-}
+#endif

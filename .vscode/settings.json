@@ -71,6 +71,8 @@
         "cassert": "cpp",
         "numbers": "cpp",
         "semaphore": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "cinttypes": "cpp",
+        "cfenv": "cpp"
     }
 }
