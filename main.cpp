@@ -3,6 +3,7 @@
 #include "ini.h"
 
 #define ELPP_NO_LOG_TO_FILE
+// #define ELPP_THREAD_SAFE
 
 #include "easylogging++.h"
 
@@ -29,6 +30,8 @@ int main(int argc, char *argv[])
     handler.irq_thread_start();
     std::this_thread::sleep_for(10ms);
     handler.storing_thread_start();
+    std::this_thread::sleep_for(10ms);
+    handler.plot_thread_start();
 
     while (true)
     {

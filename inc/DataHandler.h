@@ -23,7 +23,7 @@
 
 #include "Ads1258.h"
 #include "WAVwriter.h"
-
+#include "Plotter.h"
 
 class DataHandler
 {
@@ -32,19 +32,22 @@ private:
     /* data */
     Ads1258 _adc;
     WAVWriter _writer;
-
+    // Plotter _fft;
+    
     std::thread _irq_thread;
     std::thread _storing_thread; 
+    std::thread _fft_thread; 
 
     std::atomic_bool _run_irq_thread = true;
-    std::atomic_bool _run_filter_thread = true;
+    std::atomic_bool _run_fft_thread = true;
     std::atomic_bool _run_storing_thread = true;
 
     std::deque<ChannelData> _raw_data_queue;
 
     std::mutex _mailbox_mtx;
 
-    std::condition_variable _cv;
+    std::condition_variable _cv_raw_data;
+    std::condition_variable _cv_fft;
 
     std::vector<uint8_t> _active_channels;
     uint8_t _current_channel;
@@ -74,6 +77,9 @@ public:
 
     void storing_thread_start(void);
     void storing_thread_stop(void);
+
+    void plot_thread_start(void);
+    void fft_thread_stop(void);
 
     DataHandler();
     ~DataHandler();

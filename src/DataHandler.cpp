@@ -18,8 +18,8 @@
 #include "utils/linux_scheduling.h"
 
 #include "Iir.h"
+#include "utils/DirectForm2Neon.h"
 
-#include "Ads1258.h"
 #include "DataHandler.h"
 
 using namespace std::chrono_literals;
@@ -132,9 +132,25 @@ void DataHandler::storing_thread_stop(void)
 {
     _run_storing_thread = false;
 
-    _cv.notify_one();
+    _cv_raw_data.notify_one();
 
     _storing_thread.join();
+}
+
+void DataHandler::plot_thread_start(void)
+{
+    _run_fft_thread = true;
+
+    _fft_thread = std::thread(&DataHandler::fft_thread_func, this);
+}
+
+void DataHandler::fft_thread_stop(void)
+{
+    _run_fft_thread = false;
+
+    _cv_fft.notify_one();
+
+    _fft_thread.join();
 }
 
 void DataHandler::irq_thread_func(void)
@@ -192,7 +208,7 @@ void DataHandler::irq_thread_func(void)
 
         if (_raw_data_queue.size() >= 1000)
         {
-            _cv.notify_one();
+            _cv_raw_data.notify_one();
         }
 
 
@@ -210,7 +226,7 @@ void DataHandler::storing_thread_func(void)
 
     uint32_t sample_counter = 0;
 
-    std::vector<Iir::ChebyshevII::LowPass<16>> filters(_n_active_channels);
+    std::vector<Iir::ChebyshevII::LowPass<20, Iir::DirectFormIINeon>> filters(_n_active_channels);
 
     for (auto &filter : filters)
     {
@@ -238,7 +254,7 @@ void DataHandler::storing_thread_func(void)
 
 
                 if(_raw_data_queue.size() <= _n_active_channels)
-                    _cv.wait(lock, [&]()
+                    _cv_raw_data.wait(lock, [&]()
                             { return _raw_data_queue.size() >= 1000 || !_run_storing_thread; });
 
                 if (!_run_storing_thread)
@@ -317,4 +333,11 @@ void DataHandler::storing_thread_func(void)
     _writer.close_file();
 
     LOG(INFO) << "processing thread stopped";
+}
+
+void DataHandler::fft_thread_func(void)
+{
+    LOG(INFO) << "fft window thread starting";
+
+
 }
