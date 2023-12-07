@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <stdexcept>
 #include <system_error>
+#include <unistd.h>
 
 void set_thread_priority(int prio = 0, int scheduler = SCHED_FIFO)
 {
@@ -62,11 +63,6 @@ void set_thread_affinity(int core_id)
     if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0)
         // Throw a system_error with the error code from errno
         throw std::system_error(errno, std::system_category(), "Failed to set core isolation priority");
-}
-
-pthread_t get_pid(void)
-{
-    return pthread_self();
 }
 
 #endif

@@ -36,7 +36,7 @@ namespace Iir
 
         double filter(const double in, const Biquad &s) volatile
         {
-            float64x2_t a = {s.m_a1, s.m_a2}, b = {s.m_b1, s.m_b2};
+            const float64x2_t a = {s.m_a1, s.m_a2}, b = {s.m_b1, s.m_b2};
 
             const float64x2_t a_mul = a * m_v;
             const float64x2_t b_mul = b * m_v;

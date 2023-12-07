@@ -25,26 +25,23 @@ if(NOT easyloggingpp_POPULATED)
     add_library(easyloggingpp STATIC
         "${easyloggingpp_SOURCE_DIR}/src/easylogging++.cc"
     )
+
 endif()
 
 FetchContent_Declare(
-    inih
-    GIT_REPOSITORY https://github.com/benhoyt/inih.git
-    GIT_TAG r57
+    argparse
+    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+    GIT_TAG v3.0
 )
 
-FetchContent_GetProperties(inih)
+FetchContent_GetProperties(argparse)
 
-if(NOT inih_POPULATED)
-    FetchContent_Populate(inih)
+if(NOT argparse_POPULATED)
+    FetchContent_Populate(argparse)
 
     # Adding Easylogging++ directly to the build. This defines the EASYLOGGINGPP target.
-    include_directories("${inih_SOURCE_DIR}" "${inih_SOURCE_DIR}/cpp")
+    include_directories("${argparse_SOURCE_DIR}/include")
 
-    add_library(inih STATIC
-        "${inih_SOURCE_DIR}/ini.c"
-        "${inih_SOURCE_DIR}/cpp/INIReader.cpp"
-    )
 endif()
 
 FetchContent_Declare(
@@ -63,9 +60,6 @@ if(NOT iir1_POPULATED)
 endif()
 
 find_package(Threads REQUIRED)
-find_package(SFML COMPONENTS window graphics REQUIRED)
-
-find_library(FFTW3_LIBRARY NAMES libfftw3.a REQUIRED)
 
 find_library(GPIOD_LIBRARY NAMES libgpiod.a REQUIRED)
 
@@ -86,7 +80,6 @@ add_library(rpio_classes STATIC
     "${SRC}/spi.cpp"
 )
 
-
 add_library(Ads1258_class STATIC
     "${SRC}/Ads1258.cpp"
 )
@@ -99,16 +92,10 @@ add_library(WAVwriter_class STATIC
     "${SRC}/WAVwriter.cpp"
 )
 
-add_library(Plotter_class STATIC
-    "${SRC}/Plotter.cpp"
-)
-
 target_link_libraries(rpio_classes PRIVATE ${GPIOD_LIBRARY})
 
 target_link_libraries(Ads1258_class PRIVATE rpio_classes)
 
-target_link_libraries(Plotter_class PRIVATE  ${FFTW3_LIBRARY} sfml-graphics)
+target_link_libraries(DataHandler_class PRIVATE Ads1258_class WAVwriter_class)
 
-target_link_libraries(DataHandler_class PRIVATE Ads1258_class WAVwriter_class Plotter_class)
-
-target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp inih WAVwriter_class DataHandler_class iir_static Plotter_class) 
+target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp WAVwriter_class DataHandler_class iir_static) 

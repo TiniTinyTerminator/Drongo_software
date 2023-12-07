@@ -119,6 +119,14 @@ constexpr double channel_drate_delay_to_frequency(const double n_channels, const
     return 1 / (time * n_channels);
 }
 
+constexpr double drate_delay_to_frequency(const double drate, const double delay_us)
+{    
+    double time = 1 / drate + delay_us * 1e-6;
+
+    return 1 / time;
+}
+
+
 class Ads1258 {
 private:
     Spi _spi;

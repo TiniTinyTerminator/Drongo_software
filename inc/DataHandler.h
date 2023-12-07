@@ -23,7 +23,7 @@
 
 #include "Ads1258.h"
 #include "WAVwriter.h"
-#include "Plotter.h"
+// #include "Plotter.h"
 
 class DataHandler
 {
@@ -32,14 +32,11 @@ private:
     /* data */
     Ads1258 _adc;
     WAVWriter _writer;
-    // Plotter _fft;
     
     std::thread _irq_thread;
     std::thread _storing_thread; 
-    std::thread _fft_thread; 
 
     std::atomic_bool _run_irq_thread = true;
-    std::atomic_bool _run_fft_thread = true;
     std::atomic_bool _run_storing_thread = true;
 
     std::deque<ChannelData> _raw_data_queue;
@@ -54,6 +51,7 @@ private:
     uint8_t _n_active_channels;
 
     std::string _current_filename;
+    std::filesystem::path _data_path;
 
     double _sample_rate;
     uint32_t _n_samples_per_file;
@@ -61,14 +59,12 @@ private:
     std::chrono::system_clock::time_point _current_timestamp;
 
     void irq_thread_func(void);
-    // void filter_thread(void);
     void storing_thread_func(void);
-    void fft_thread_func(void);
 
 public:
-    void get_configuration(std::filesystem::path path);
-    void setup_adc(uint32_t tries);
-
+    void set_data_path(std::filesystem::path path);
+    void setup_adc(const uint32_t n_channels, const uint32_t max_tries = 10);
+    
     void new_file(void);
     void delete_last_file(void);
 
@@ -77,9 +73,6 @@ public:
 
     void storing_thread_start(void);
     void storing_thread_stop(void);
-
-    void plot_thread_start(void);
-    void fft_thread_stop(void);
 
     DataHandler();
     ~DataHandler();

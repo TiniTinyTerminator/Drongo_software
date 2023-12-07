@@ -73,6 +73,9 @@
         "semaphore": "cpp",
         "span": "cpp",
         "cinttypes": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "any": "cpp",
+        "charconv": "cpp",
+        "variant": "cpp"
     }
 }

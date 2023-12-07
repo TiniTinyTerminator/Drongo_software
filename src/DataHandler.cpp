@@ -33,7 +33,7 @@ DataHandler::~DataHandler()
     _writer.close_file();
 }
 
-void DataHandler::setup_adc(const uint32_t max_tries = 10)
+void DataHandler::setup_adc(const uint32_t n_channels, const uint32_t max_tries)
 {
     uint32_t tries = 0;
 
@@ -56,16 +56,39 @@ void DataHandler::setup_adc(const uint32_t max_tries = 10)
         _adc.enable_bypass(false);
         _adc.enable_status(true);
         _adc.enable_external_clock(false);
-        _adc.set_drate(DrateConfig::DRATE_3);
-        _adc.set_delay(DelayConfig::DLY_0us);
         _adc.enable_auto(true);
-        _adc.set_auto_single_channel({.raw_data = 0b1111111111110000});
+
+        switch (n_channels)
+        {
+        case 1:
+            _adc.set_drate(DrateConfig::DRATE_1);
+            _adc.set_delay(DelayConfig::DLY_0us);
+            _adc.set_auto_single_channel({.raw_data = 0b1110000000000000});
+            break;
+        case 2:
+            _adc.set_drate(DrateConfig::DRATE_2);
+            _adc.set_delay(DelayConfig::DLY_16us);
+            _adc.set_auto_single_channel({.raw_data = 0b1111110000000000});
+            break;
+        case 3:
+            _adc.set_drate(DrateConfig::DRATE_3);
+            _adc.set_delay(DelayConfig::DLY_8us);
+            _adc.set_auto_single_channel({.raw_data = 0b1111111110000000});
+            break;
+        case 4:
+            _adc.set_drate(DrateConfig::DRATE_3);
+            _adc.set_delay(DelayConfig::DLY_0us);
+            _adc.set_auto_single_channel({.raw_data = 0b1111111111110000});
+            break;
+        default:
+            throw std::invalid_argument("n_channels has to be between 1 and 4");
+            break;
+        }
 
         if (_adc.verify_settings())
             break;
         else
             tries++;
-
 
         LOG(WARNING) << "tried setting up adc " << tries << " times";
 
@@ -86,6 +109,25 @@ void DataHandler::setup_adc(const uint32_t max_tries = 10)
     _writer.set_sample_rate(_sample_rate);
 }
 
+void DataHandler::set_data_path(std::filesystem::path path)
+{
+    if (std::filesystem::is_directory(path))
+    {
+        _data_path = path;
+    }
+    else
+    {
+        if (std::filesystem::create_directory(path))
+        {
+            _data_path = path;
+        }
+        else
+        {
+            throw std::runtime_error("Could not create file directory for data");
+        }
+    }
+}
+
 void DataHandler::new_file(void)
 {
     _writer.close_file();
@@ -94,7 +136,7 @@ void DataHandler::new_file(void)
     time_t in_time_t = std::chrono::system_clock::to_time_t(_current_timestamp);
     ss << std::put_time(std::localtime(&in_time_t), "date-%Y-%m-%d-time-%H-%M-%S.wav");
 
-    _writer.open_file(ss.str());
+    _writer.open_file(_data_path.string() + "/" + ss.str());
     _current_filename = ss.str();
 
     _writer.set_datetime(_current_timestamp);
@@ -137,26 +179,10 @@ void DataHandler::storing_thread_stop(void)
     _storing_thread.join();
 }
 
-void DataHandler::plot_thread_start(void)
-{
-    _run_fft_thread = true;
-
-    _fft_thread = std::thread(&DataHandler::fft_thread_func, this);
-}
-
-void DataHandler::fft_thread_stop(void)
-{
-    _run_fft_thread = false;
-
-    _cv_fft.notify_one();
-
-    _fft_thread.join();
-}
-
 void DataHandler::irq_thread_func(void)
 {
-    set_thread_priority(80, SCHED_OTHER);
-    // set_thread_affinity(0);
+    set_thread_priority(99, SCHED_FIFO);
+    set_thread_affinity(0);
 
     LOG(INFO) << "starting sampling";
 
@@ -164,11 +190,13 @@ void DataHandler::irq_thread_func(void)
 
     auto t_now = std::chrono::system_clock::now(), t_prev = t_now;
 
+    constexpr int64_t sample_period_ns = std::ceil(1e9 / drate_delay_to_frequency(AUTO_DRATE3, DLY0));
+
     std::this_thread::sleep_for(1us);
 
     ChannelData previous;
 
-    uint32_t i = 0;
+    uint32_t i = 0, wrong_data = 0;
 
     while (_run_irq_thread)
     {
@@ -178,49 +206,61 @@ void DataHandler::irq_thread_func(void)
         try
         {
             current = _adc.get_data_read();
-            // std::this_thread::sleep_for(10us);
         }
         catch (const std::exception &e)
         {
             LOG(ERROR) << e.what();
 
-            current = {};
+            current = {{0, 0}, {0, 0}};
         }
 
         auto [a, b] = current;
 
-        if(a.first == b.first && a.second != b.second) continue;
+        if (a.first == b.first && a.second != b.second)
+        {
+            wrong_data++;
+            continue;
+        }
 
-        if (previous == a) continue;
+        if (previous == a)
+            continue;
 
         previous = a;
 
-        int64_t us_diff = std::chrono::duration_cast<std::chrono::microseconds>(t_now - t_prev).count();
+        t_now = std::chrono::system_clock::now();
 
-        // LOG_IF(us_diff > 100, INFO) << us_diff << " microseconds";
+        int64_t diff_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t_now - t_prev).count();
 
         t_prev = t_now;
-        t_now = std::chrono::system_clock::now();
+
+        // if(diff_ns > sample_period_ns)
+        // {
+        //     int64_t missed_packets = diff_ns / sample_period_ns;
+
+        //     while(missed_packets-- > 0)
+        //     {
+        //         _raw_data_queue.push_back({0,0});
+        //     }
+
+        // }
 
         std::unique_lock lock(_mailbox_mtx);
 
-        _raw_data_queue.push_back(current.first);
+        _raw_data_queue.push_back(a);
 
         if (_raw_data_queue.size() >= 1000)
         {
             _cv_raw_data.notify_one();
         }
-
-
     }
 }
 
 void DataHandler::storing_thread_func(void)
 {
-    LOG(INFO) << "processing thread starting";
+    set_thread_priority(50, SCHED_OTHER);
+    set_thread_affinity(1);
 
-    // set_realtime_priority();
-    // set_thread_affinity(1);
+    LOG(INFO) << "processing thread starting";
 
     _current_timestamp = std::chrono::system_clock::now();
 
@@ -230,7 +270,7 @@ void DataHandler::storing_thread_func(void)
 
     for (auto &filter : filters)
     {
-        filter.setup(_sample_rate, 500, 60);
+        filter.setup(_sample_rate, 550, 60);
         filter.reset();
     }
 
@@ -252,10 +292,9 @@ void DataHandler::storing_thread_func(void)
 
                 std::unique_lock lock(_mailbox_mtx);
 
-
-                if(_raw_data_queue.size() <= _n_active_channels)
+                if (_raw_data_queue.size() <= _n_active_channels)
                     _cv_raw_data.wait(lock, [&]()
-                            { return _raw_data_queue.size() >= 1000 || !_run_storing_thread; });
+                                      { return _raw_data_queue.size() >= 1000 || !_run_storing_thread; });
 
                 if (!_run_storing_thread)
                     break;
@@ -281,7 +320,6 @@ void DataHandler::storing_thread_func(void)
 
             sorted_sample_queue.push_back(samples);
         }
-
 
         while (sorted_sample_queue.size() > 10)
         {
@@ -333,11 +371,4 @@ void DataHandler::storing_thread_func(void)
     _writer.close_file();
 
     LOG(INFO) << "processing thread stopped";
-}
-
-void DataHandler::fft_thread_func(void)
-{
-    LOG(INFO) << "fft window thread starting";
-
-
 }
