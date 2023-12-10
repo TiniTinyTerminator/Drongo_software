@@ -5,8 +5,8 @@ After=network.target
 [Service]
 ExecStart=/usr/local/bin/Drongo_software
 Restart=on-failure
-User=pi
-Group=pi
+User=max
+Group=max
 
 [Install]
 WantedBy=multi-user.target
