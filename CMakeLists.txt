@@ -98,4 +98,10 @@ target_link_libraries(Ads1258_class PRIVATE rpio_classes)
 
 target_link_libraries(DataHandler_class PRIVATE Ads1258_class WAVwriter_class)
 
-target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp WAVwriter_class DataHandler_class iir_static) 
+target_link_libraries(Drongo_software PRIVATE Ads1258_class Threads::Threads easyloggingpp WAVwriter_class DataHandler_class iir_static)
+
+# Installation rules
+install(TARGETS Drongo_software DESTINATION bin)
+
+# If you have any configuration files or other data files to install:
+install(FILES Drongo.conf DESTINATION etc)

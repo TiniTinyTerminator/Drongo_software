@@ -1,0 +1,12 @@
+[Unit]
+Description=Drongo control software
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/Drongo_software
+Restart=on-failure
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target
