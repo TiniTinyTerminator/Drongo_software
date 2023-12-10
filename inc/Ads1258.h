@@ -165,9 +165,9 @@ public:
     void enable_status(bool enable_stats);
     void enable_sleep_mode(bool sleep_mode);
 
-    void set_drate(DrateConfig drate);
+    void set_drate(uint32_t drate);
     void set_scbcs(ScbcsConfig scbcs);
-    void set_delay(DelayConfig delay);
+    void set_delay(uint32_t delay);
 
     void set_fixed_channel(FixedChannel channel);
     void set_auto_single_channel(SingleChannel channels);

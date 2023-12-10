@@ -58,8 +58,7 @@ private:
 
     std::chrono::system_clock::time_point _current_timestamp;
 
-    void irq_thread_func(void);
-    void storing_thread_func(void);
+
 
 public:
     void set_data_path(std::filesystem::path path);
@@ -73,6 +72,9 @@ public:
 
     void storing_thread_start(void);
     void storing_thread_stop(void);
+
+    void irq_thread_func(void);
+    void storing_thread_func(void);
 
     DataHandler();
     ~DataHandler();

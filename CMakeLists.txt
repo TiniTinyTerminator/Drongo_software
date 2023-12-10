@@ -105,3 +105,7 @@ install(TARGETS Drongo_software DESTINATION bin)
 
 # If you have any configuration files or other data files to install:
 install(FILES Drongo.conf DESTINATION etc)
+
+install(FILES drongo.service
+        DESTINATION "/etc/systemd/system/"
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)

@@ -275,7 +275,7 @@ void Ads1258::enable_sleep_mode(bool sleep_mode)
     registers[RegisterAdressses::CONFIG1] = cf1.raw_data;
 }
 
-void Ads1258::set_drate(DrateConfig drate)
+void Ads1258::set_drate(uint32_t drate)
 {
     Config1 cf1 = {.raw_data = registers[RegisterAdressses::CONFIG1]};
 
@@ -303,7 +303,7 @@ void Ads1258::set_scbcs(ScbcsConfig scbcs)
     registers[RegisterAdressses::CONFIG1] = cf1.raw_data;
 }
 
-void Ads1258::set_delay(DelayConfig delay)
+void Ads1258::set_delay(uint32_t delay)
 {
     Config1 cf1 = {.raw_data = registers[RegisterAdressses::CONFIG1]};
 

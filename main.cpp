@@ -55,12 +55,8 @@ int main(int argc, char *argv[])
 
     handler.irq_thread_start();
     std::this_thread::sleep_for(10ms);
-    handler.storing_thread_start();
+    handler.storing_thread_func();
 
-    while (true)
-    {
-        std::this_thread::sleep_for(10ms);
-    }
 
     return 0;
 }

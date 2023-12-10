@@ -37,6 +37,43 @@ void DataHandler::setup_adc(const uint32_t n_channels, const uint32_t max_tries)
 {
     uint32_t tries = 0;
 
+    uint16_t dly = 0, speed = 0, channels = 0, sample_speed = 0, delay = 0;
+
+    switch (n_channels)
+    {
+    case 1:
+        dly = DelayConfig::DLY_0us;
+        speed = DrateConfig::DRATE_1;
+        channels = 0b1110000000000000;
+        sample_speed = AUTO_DRATE1;
+        delay = DLY0;
+        break;
+    case 2:
+        dly = DelayConfig::DLY_16us;
+        speed = DrateConfig::DRATE_2;
+        channels = 0b1111110000000000;
+        sample_speed = AUTO_DRATE2;
+        delay = DLY2;
+        break;
+    case 3:
+        dly = DelayConfig::DLY_8us;
+        speed = DrateConfig::DRATE_3;
+        channels = 0b1111111110000000;
+        sample_speed = AUTO_DRATE3;
+        delay = DLY1;
+        break;
+    case 4:
+        dly = DelayConfig::DLY_0us;
+        speed = DrateConfig::DRATE_3;
+        channels = 0b1111111111110000;
+        sample_speed = AUTO_DRATE3;
+        delay = DLY0;
+        break;
+    default:
+        throw std::invalid_argument("n_channels has to be between 1 and 4");
+        break;
+    }
+
     do
     {
         _adc.pwdn(true);
@@ -58,32 +95,9 @@ void DataHandler::setup_adc(const uint32_t n_channels, const uint32_t max_tries)
         _adc.enable_external_clock(false);
         _adc.enable_auto(true);
 
-        switch (n_channels)
-        {
-        case 1:
-            _adc.set_drate(DrateConfig::DRATE_1);
-            _adc.set_delay(DelayConfig::DLY_0us);
-            _adc.set_auto_single_channel({.raw_data = 0b1110000000000000});
-            break;
-        case 2:
-            _adc.set_drate(DrateConfig::DRATE_2);
-            _adc.set_delay(DelayConfig::DLY_16us);
-            _adc.set_auto_single_channel({.raw_data = 0b1111110000000000});
-            break;
-        case 3:
-            _adc.set_drate(DrateConfig::DRATE_3);
-            _adc.set_delay(DelayConfig::DLY_8us);
-            _adc.set_auto_single_channel({.raw_data = 0b1111111110000000});
-            break;
-        case 4:
-            _adc.set_drate(DrateConfig::DRATE_3);
-            _adc.set_delay(DelayConfig::DLY_0us);
-            _adc.set_auto_single_channel({.raw_data = 0b1111111111110000});
-            break;
-        default:
-            throw std::invalid_argument("n_channels has to be between 1 and 4");
-            break;
-        }
+        _adc.set_drate(speed);
+        _adc.set_delay(dly);
+        _adc.set_auto_single_channel({.raw_data = channels});
 
         if (_adc.verify_settings())
             break;
@@ -100,7 +114,9 @@ void DataHandler::setup_adc(const uint32_t n_channels, const uint32_t max_tries)
     _active_channels = _adc.get_active_channels();
     _n_active_channels = _active_channels.size();
 
-    _sample_rate = channel_drate_delay_to_frequency(_n_active_channels, AUTO_DRATE3, DLY0);
+    _sample_rate = channel_drate_delay_to_frequency(_n_active_channels, sample_speed, delay);
+
+    LOG(INFO) << "will sample " << (uint32_t)_n_active_channels << " channels at " << _sample_rate << "Hz";
 
     _n_samples_per_file = _sample_rate * 30;
 
@@ -181,7 +197,7 @@ void DataHandler::storing_thread_stop(void)
 
 void DataHandler::irq_thread_func(void)
 {
-    set_thread_priority(99, SCHED_FIFO);
+    set_thread_priority(99, SCHED_OTHER);
     set_thread_affinity(0);
 
     LOG(INFO) << "starting sampling";
@@ -233,6 +249,8 @@ void DataHandler::irq_thread_func(void)
 
         t_prev = t_now;
 
+        // LOG_EVERY_N(1000, INFO) << diff_ns;
+
         // if(diff_ns > sample_period_ns)
         // {
         //     int64_t missed_packets = diff_ns / sample_period_ns;
@@ -248,7 +266,7 @@ void DataHandler::irq_thread_func(void)
 
         _raw_data_queue.push_back(a);
 
-        if (_raw_data_queue.size() >= 1000)
+        if (_raw_data_queue.size() >= 2000)
         {
             _cv_raw_data.notify_one();
         }
@@ -257,7 +275,7 @@ void DataHandler::irq_thread_func(void)
 
 void DataHandler::storing_thread_func(void)
 {
-    set_thread_priority(50, SCHED_OTHER);
+    set_thread_priority(99, SCHED_OTHER);
     set_thread_affinity(1);
 
     LOG(INFO) << "processing thread starting";
@@ -270,7 +288,7 @@ void DataHandler::storing_thread_func(void)
 
     for (auto &filter : filters)
     {
-        filter.setup(_sample_rate, 550, 60);
+        filter.setup(_sample_rate, 450, 60);
         filter.reset();
     }
 
@@ -283,7 +301,7 @@ void DataHandler::storing_thread_func(void)
 
         int32_t i = 0, c = 0;
 
-        while (_run_storing_thread && sorted_sample_queue.size() < 1000)
+        while (_run_storing_thread && sorted_sample_queue.size() < 4000)
         {
             std::vector<int32_t> samples(_n_active_channels);
 
@@ -294,7 +312,7 @@ void DataHandler::storing_thread_func(void)
 
                 if (_raw_data_queue.size() <= _n_active_channels)
                     _cv_raw_data.wait(lock, [&]()
-                                      { return _raw_data_queue.size() >= 1000 || !_run_storing_thread; });
+                                      { return _raw_data_queue.size() >= 4000 || !_run_storing_thread; });
 
                 if (!_run_storing_thread)
                     break;
@@ -321,7 +339,7 @@ void DataHandler::storing_thread_func(void)
             sorted_sample_queue.push_back(samples);
         }
 
-        while (sorted_sample_queue.size() > 10)
+        while (sorted_sample_queue.size() > 100)
         {
             std::vector<int32_t> sample = sorted_sample_queue.front();
 
@@ -342,24 +360,22 @@ void DataHandler::storing_thread_func(void)
 
             _writer.write_channels(sample);
 
-            sample_counter++;
+            if (sample_counter++ > _n_samples_per_file)
+            {
+                _current_timestamp = std::chrono::system_clock::now();
+
+                std::stringstream ss;
+                time_t in_time_t = std::chrono::system_clock::to_time_t(_current_timestamp);
+                ss << "end time: " << std::put_time(std::localtime(&in_time_t), "%Y/%m/%d %H:%M:%S");
+
+                _writer.set_comments(ss.str());
+
+                sample_counter = 0;
+
+                new_file();
+            }
 
             sorted_sample_queue.pop_front();
-        }
-
-        if (sample_counter > _n_samples_per_file)
-        {
-            _current_timestamp = std::chrono::system_clock::now();
-
-            std::stringstream ss;
-            time_t in_time_t = std::chrono::system_clock::to_time_t(_current_timestamp);
-            ss << "end time: " << std::put_time(std::localtime(&in_time_t), "%Y/%m/%d %H:%M:%S");
-
-            _writer.set_comments(ss.str());
-
-            sample_counter = 0;
-
-            new_file();
         }
     }
 
