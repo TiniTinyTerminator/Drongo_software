@@ -1,6 +1,6 @@
 /**
  * @file Ads1258.h
- * @author your name (you@domain.com)
+ * @author Max Bensink (maxbensink@outlook.com)
  * @brief
  * @version 0.1
  * @date 2023-10-30
@@ -307,19 +307,45 @@ public:
     void set_gpio_output(GpioOutput outputs);
 
     /**
-     * @brief Get the gpio intput ob
+     * @brief Get the gpio intput byte
      * 
-     * @return GpioInput 
+     * @return GpioInput byte of input data
      */
     GpioInput get_gpio_input(void);
+
+    /**
+     * @brief Get the id of ADC
+     * 
+     * @return ADC value
+     */
     IdReg get_id(void);
 
-    // bool await_data_ready(void);
-
+    /**
+     * @brief Get 2 pairs of channeldata
+     * 
+     * @return std::pair<ChannelData, ChannelData> 2 pairs of adc data
+     */
     std::pair<ChannelData, ChannelData> get_data_read(void);
 
+    /**
+     * @brief Get the data using data direct command
+     * 
+     * @return ChannelData channeldata
+     */
     ChannelData get_data_direct(void);
+
+    /**
+     * @brief Get the active channels
+     * 
+     * @return std::vector<uint8_t> active channels
+     */
     std::vector<uint8_t> get_active_channels(void);
+
+    /**
+     * @brief Get the current channel
+     * 
+     * @return uint8_t current channel id
+     */
     uint8_t get_current_channel(void);
 };
 

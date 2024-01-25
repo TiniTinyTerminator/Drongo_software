@@ -299,8 +299,7 @@ void DataHandler::storing_thread_func(void)
             {
                 if (!_run_storing_thread)
                     break;
-                std::
-                 lock(_mailbox_mtx);
+                std::unique_lock lock(_mailbox_mtx);
 
                 if (_raw_data_queue.size() <= _n_active_channels)
                     _cv_raw_data.wait(lock, [&]()

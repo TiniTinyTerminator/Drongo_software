@@ -1,6 +1,6 @@
 /**
  * @file commands.h
- * @author your name (you@domain.com)
+ * @author Max Bensink (maxbensink@outlook.com)
  * @brief
  * @version 0.1
  * @date 2023-10-30
