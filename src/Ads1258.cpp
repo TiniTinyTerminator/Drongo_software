@@ -1,6 +1,6 @@
 /**
  * @file Ads1258.cpp
- * @author your name (you@domain.com)
+ * @author Max Bensink (maxbensink@outlook.com)
  * @brief
  * @version 0.1
  * @date 2023-10-30
@@ -380,7 +380,7 @@ void Ads1258::set_gpio_output(GpioOutput outputs)
     set_register(RegisterAdressses::GPIOD, outputs.raw_data);
 }
 
-GpioInput Ads1258::get_gpio_intput(void)
+GpioInput Ads1258::get_gpio_input(void)
 {
     return {.raw_data = static_cast<char>((get_register(RegisterAdressses::GPIOD) & registers[RegisterAdressses::GPIOC]))};
 }

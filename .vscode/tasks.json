@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "ssh",  // SSH into the Raspberry Pi
             "args": [
-                "max@192.168.1.140",  // Replace with your Raspberry Pi's SSH address
+                "max@192.168.240.148",  // Replace with your Raspberry Pi's SSH address
                 "'gdbserver --multi :4711 ~/Drongo_software'", 
             ],
             "group": {
@@ -36,7 +36,7 @@
 		{
 			"label": "copy to rpi",
 			"type": "shell",
-			"command": "scp ${workspaceFolder}/build/Drongo_software max@192.168.1.140:~/",
+			"command": "scp ${workspaceFolder}/build/Drongo_software max@192.168.240.148:~/",
 			"problemMatcher": [],
 			// "dependsOn": "CMake Build"
 		},

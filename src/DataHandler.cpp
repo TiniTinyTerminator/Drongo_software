@@ -204,7 +204,7 @@ void DataHandler::irq_thread_func(void)
 
     _adc.start(true);
 
-    auto t_now = std::chrono::system_clock::now(), t_prev = t_now;
+    // auto t_now = std::chrono::system_clock::now(), t_prev = t_now;
 
     constexpr int64_t sample_period_ns = std::ceil(1e9 / drate_delay_to_frequency(AUTO_DRATE3, DLY0));
 
@@ -234,7 +234,13 @@ void DataHandler::irq_thread_func(void)
 
         if (a.first == b.first && a.second != b.second)
         {
-            wrong_data++;
+            if(wrong_data > 1000) {
+                LOG_EVERY_N(1000, WARNING) << "1000 missed packages";
+                wrong_data = 0;
+            }
+            else
+                wrong_data++;
+
             continue;
         }
 
@@ -243,30 +249,12 @@ void DataHandler::irq_thread_func(void)
 
         previous = a;
 
-        t_now = std::chrono::system_clock::now();
-
-        int64_t diff_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t_now - t_prev).count();
-
-        t_prev = t_now;
-
-        // LOG_EVERY_N(1000, INFO) << diff_ns;
-
-        // if(diff_ns > sample_period_ns)
-        // {
-        //     int64_t missed_packets = diff_ns / sample_period_ns;
-
-        //     while(missed_packets-- > 0)
-        //     {
-        //         _raw_data_queue.push_back({0,0});
-        //     }
-
-        // }
 
         std::unique_lock lock(_mailbox_mtx);
 
         _raw_data_queue.push_back(a);
 
-        if (_raw_data_queue.size() >= 2000)
+        if (_raw_data_queue.size() >= 4000)
         {
             _cv_raw_data.notify_one();
         }
@@ -296,26 +284,27 @@ void DataHandler::storing_thread_func(void)
 
     std::deque<std::vector<int32_t>> sorted_sample_queue;
 
+    std::vector<int32_t> prev_sample(_n_active_channels);
+
     while (_run_storing_thread)
     {
 
         int32_t i = 0, c = 0;
 
-        while (_run_storing_thread && sorted_sample_queue.size() < 4000)
+        while (_run_storing_thread && sorted_sample_queue.size() < 1000)
         {
             std::vector<int32_t> samples(_n_active_channels);
 
             for (uint32_t c = 0; c < _n_active_channels; c++)
             {
-
-                std::unique_lock lock(_mailbox_mtx);
+                if (!_run_storing_thread)
+                    break;
+                std::
+                 lock(_mailbox_mtx);
 
                 if (_raw_data_queue.size() <= _n_active_channels)
                     _cv_raw_data.wait(lock, [&]()
                                       { return _raw_data_queue.size() >= 4000 || !_run_storing_thread; });
-
-                if (!_run_storing_thread)
-                    break;
 
                 ChannelData channel_sample = _raw_data_queue.front();
 
@@ -341,24 +330,19 @@ void DataHandler::storing_thread_func(void)
 
         while (sorted_sample_queue.size() > 100)
         {
-            std::vector<int32_t> sample = sorted_sample_queue.front();
+            std::vector<int32_t> sample = sorted_sample_queue[0], next_sample = sorted_sample_queue[1];
 
             for (uint32_t i = 0; i < _n_active_channels; i++)
             {
                 if (sample[i] == 0)
-                    for (auto next = sorted_sample_queue.begin() + 1; next != sorted_sample_queue.end(); next++)
-                    {
-                        if (next->at(i) != 0)
-                        {
-                            sample[i] = next->at(i);
-                            break;
-                        }
-                    }
+                    sample[i] = (prev_sample[i] + next_sample.at(i)) >> 1;
 
                 sample[i] = filters[i].filter(sample[i]);
             }
 
             _writer.write_channels(sample);
+
+            prev_sample = sample;
 
             if (sample_counter++ > _n_samples_per_file)
             {
